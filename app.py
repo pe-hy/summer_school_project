@@ -124,6 +124,26 @@ try:
 except RuntimeError as e:
     sys.exit(f"ERROR: {e}")
 Submission = Query()
+
+
+def _migrate_legacy_rows() -> None:
+    """Rows written by an older version (separate first/last-name fields) are
+    merged into the single 'name' field on startup, so old databases just work."""
+    for doc in submissions.all():
+        legacy = doc.get("surname")
+        if legacy is None and "person_key" in doc and doc["person_key"] == unicodedata.normalize("NFKC", doc.get("name", "")).casefold():
+            continue
+        name = " ".join(part for part in (doc.get("name", ""), legacy or "") if part).strip()
+        if not name:
+            continue
+        updated = {k: v for k, v in doc.items() if k != "surname"}
+        updated["name"] = name[:MAX_NAME_LEN]
+        updated["person_key"] = unicodedata.normalize("NFKC", updated["name"]).casefold()
+        submissions.remove(doc_ids=[doc.doc_id])
+        submissions.insert(updated)
+
+
+_migrate_legacy_rows()
 _thread_lock = threading.Lock()   # TinyDB is not thread-safe; Flask's dev server is threaded
 _LOCK_PATH = DB_PATH.with_name(DB_PATH.name + ".lock")
 

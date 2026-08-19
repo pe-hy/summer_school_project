@@ -9,7 +9,7 @@ exactly what to fix.
 
 | Column         | Type                 | Meaning                                  |
 |----------------|----------------------|------------------------------------------|
-| `name`         | text, max 80 chars   | your full name (e.g. `Jane Doe`)         |
+| `name`         | text, max 80 chars   | your name                                |
 | `metric`       | number               | your final score on the test set         |
 | `train_time_s` | number, ≥ 0          | training wall-clock time in **seconds**  |
 | `test_time_s`  | number, ≥ 0          | inference time on the test set, seconds  |
