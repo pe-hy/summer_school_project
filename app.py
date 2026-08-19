@@ -48,11 +48,11 @@ ADMIN_KEY = os.environ.get("LEADERBOARD_ADMIN_KEY") or None
 # ----------------------------------------------------------------------------
 # Submission schema (keep in sync with static/app.js and submit_readme.md)
 # ----------------------------------------------------------------------------
-STRING_FIELDS = ("name", "surname")
+STRING_FIELDS = ("name",)
 NUMBER_FIELDS = ("metric", "train_time_s", "test_time_s")
 NON_NEGATIVE_FIELDS = ("train_time_s", "test_time_s")
 FIELDS = STRING_FIELDS + NUMBER_FIELDS
-MAX_NAME_LEN = 60
+MAX_NAME_LEN = 80
 MAX_ABS_NUMBER = 1e15          # anything bigger is certainly a mistake
 MAX_SUBMISSIONS = 500          # hard cap on rows (the API is unauthenticated)
 TOKEN_MIN_LEN, TOKEN_MAX_LEN = 16, 64
@@ -204,8 +204,7 @@ def validate_entry(data: object) -> tuple[dict | None, list[str]]:
 
 def person_key(entry: dict) -> str:
     """Case-insensitive identity used to stop the same person appearing twice."""
-    norm = lambda s: unicodedata.normalize("NFKC", s).casefold()
-    return f"{norm(entry['name'])}|{norm(entry['surname'])}"
+    return unicodedata.normalize("NFKC", entry["name"]).casefold()
 
 
 def public_row(doc: dict, owner_hash: str | None) -> dict:
@@ -213,7 +212,6 @@ def public_row(doc: dict, owner_hash: str | None) -> dict:
     return {
         "id": doc.get("id"),
         "name": doc.get("name", ""),
-        "surname": doc.get("surname", ""),
         "metric": doc.get("metric"),
         "train_time_s": doc.get("train_time_s"),
         "test_time_s": doc.get("test_time_s"),
@@ -263,7 +261,7 @@ def upsert_my_submission():
         # the same person must not appear twice under different tokens
         same_person = submissions.get(Submission.person_key == person_key(clean))
         if same_person and (not existing or same_person.doc_id != existing.doc_id):
-            msg = (f"A submission for {same_person['name']} {same_person['surname']} already exists and was uploaded from a "
+            msg = (f"A submission for {same_person['name']} already exists and was uploaded from a "
                    "different browser. If it is yours, use that browser to replace it, or ask an organiser to remove it.")
             return jsonify({"error": "Duplicate person.", "details": [msg]}), 409
         if existing:

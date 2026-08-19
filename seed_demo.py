@@ -16,17 +16,17 @@ import uuid
 BASE = sys.argv[1].rstrip("/") if len(sys.argv) > 1 else "http://localhost:8000"
 
 DEMO = [
-    ("Alice", "Nováková", 0.9412, 210.3, 2.11),
-    ("Bob", "Svoboda", 0.9275, 95.0, 1.48),
-    ("Carla", "Dvořáková", 0.9380, 402.7, 3.95),
-    ("David", "Kučera", 0.9012, 61.2, 0.98),
-    ("Eva", "Horáková", 0.9412, 180.0, 2.60),
+    ("Alice Nováková", 0.9412, 210.3, 2.11),
+    ("Bob Svoboda", 0.9275, 95.0, 1.48),
+    ("Carla Dvořáková", 0.9380, 402.7, 3.95),
+    ("David Kučera", 0.9012, 61.2, 0.98),
+    ("Eva Horáková", 0.9412, 180.0, 2.60),
 ]
 
 with open("seed_tokens.txt", "a", encoding="utf-8") as log:
-    for name, surname, metric, train, test in DEMO:
+    for name, metric, train, test in DEMO:
         token = uuid.uuid4().hex
-        body = json.dumps({"name": name, "surname": surname, "metric": metric,
+        body = json.dumps({"name": name, "metric": metric,
                            "train_time_s": train, "test_time_s": test}).encode()
         req = urllib.request.Request(
             f"{BASE}/api/submissions/mine", data=body, method="PUT",
@@ -35,10 +35,10 @@ with open("seed_tokens.txt", "a", encoding="utf-8") as log:
         try:
             with urllib.request.urlopen(req, timeout=10) as resp:
                 sub = json.loads(resp.read())["submission"]
-                print(f"{resp.status}  {sub['id']}  {name} {surname}  token={token}")
-                log.write(f"{token}\t{sub['id']}\t{name} {surname}\n")
+                print(f"{resp.status}  {sub['id']}  {name}  token={token}")
+                log.write(f"{token}\t{sub['id']}\t{name}\n")
         except urllib.error.HTTPError as e:
-            print(f"{e.code}  {name} {surname}: {e.read().decode(errors='replace')}")
+            print(f"{e.code}  {name}: {e.read().decode(errors='replace')}")
         except urllib.error.URLError as e:
             sys.exit(f"Cannot reach {BASE}: {e.reason}. Is the server running?")
 print("tokens appended to seed_tokens.txt")

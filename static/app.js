@@ -16,18 +16,18 @@
     METRIC_LABEL: "Metric",          // shown in the column header
     METRIC_HIGHER_IS_BETTER: true,   // rank #1 = highest metric (set false for loss/error metrics)
     REFRESH_MS: 10000,               // background refresh interval
-    MAX_NAME_LEN: 60,
+    MAX_NAME_LEN: 80,
     MAX_ABS_NUMBER: 1e15,
     MAX_FILE_BYTES: 64 * 1024,
   };
 
   // Keep in sync with app.py (validate_entry) and submit_readme.md
-  const FIELDS = ["name", "surname", "metric", "train_time_s", "test_time_s"];
-  const STRING_FIELDS = ["name", "surname"];
+  const FIELDS = ["name", "metric", "train_time_s", "test_time_s"];
+  const STRING_FIELDS = ["name"];
   const NUMBER_FIELDS = ["metric", "train_time_s", "test_time_s"];
   const NON_NEGATIVE_FIELDS = ["train_time_s", "test_time_s"];
   const FIELD_LABELS = {
-    name: "Name", surname: "Surname", metric: CONFIG.METRIC_LABEL,
+    name: "Name", metric: CONFIG.METRIC_LABEL,
     train_time_s: "Train time (s)", test_time_s: "Test time (s)",
   };
 
@@ -233,7 +233,7 @@
       data = data[0];
     }
     if (data === null || typeof data !== "object" || Array.isArray(data)) {
-      return { errors: ["The JSON must be an object with the keys name, surname, metric, train_time_s, test_time_s."] };
+      return { errors: ["The JSON must be an object with the keys name, metric, train_time_s, test_time_s."] };
     }
     const errors = [];
     const obj = {};
@@ -395,7 +395,6 @@
         nameCell.appendChild(badge);
       }
       tr.appendChild(nameCell);
-      tr.appendChild(td("name-cell", r.surname));
       tr.appendChild(td("num", fmtMetric(r.metric)));
       tr.appendChild(td("num", fmtTime(r.train_time_s)));
       tr.appendChild(td("num", fmtTime(r.test_time_s)));
@@ -422,7 +421,7 @@
     if (shape === state.statusShape && state.statusNodes) {
       // same structure: update the text only (keeps keyboard focus on Edit/Delete, no live-region rebuild)
       if (m) {
-        state.statusNodes.name.textContent = `${m.name} ${m.surname}`;
+        state.statusNodes.name.textContent = m.name;
         state.statusNodes.summary.textContent = summary;
       }
       return;
@@ -443,7 +442,7 @@
       badge.textContent = "your submission";
       const text = document.createElement("span");
       const strong = document.createElement("strong");
-      strong.textContent = `${m.name} ${m.surname}`;
+      strong.textContent = m.name;
       const summaryNode = document.createTextNode(summary);
       text.append(strong, summaryNode);
       const edit = document.createElement("button");

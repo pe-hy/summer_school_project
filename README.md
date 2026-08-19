@@ -8,7 +8,7 @@ the table updates live and can be sorted by any column.
 
 ## Features
 
-- **Sortable table** — rank, Name, Surname, Metric, Train time (s), Test time (s), Submitted.
+- **Sortable table** — rank, Name, Metric, Train time (s), Test time (s), Submitted.
   Rank is computed from the metric (ties broken by test time, then train time).
 - **Upload / edit / delete** — the file is parsed and validated **in the browser**
   (required columns, numeric types, exactly one row, friendly error messages) and
@@ -91,7 +91,7 @@ It is also rendered at `/guide` on the running site. Templates:
 | `DELETE` | `/api/submissions/<id>`  | organiser delete (header `X-Admin-Key`)              |
 
 The caller is identified by the `X-Owner-Token` header (the browser sends it
-automatically). A person (`name` + `surname`, case-insensitive) can only appear
+automatically). A `name` (case-insensitive) can only appear
 once: a second browser uploading the same name gets `409` and is told to ask an
 organiser.
 
