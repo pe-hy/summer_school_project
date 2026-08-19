@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ostr-AI 2026 · Final Project Leaderboard</title>
+  <meta name="description" content="Leaderboard of final projects — Ostr-AI AI Summer School 2026">
+  <link rel="icon" type="image/png" href="/static/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="/">
+        <img src="/static/logo.png" alt="" class="brand-logo" width="88" height="86">
+        <div class="brand-text">
+          <span class="brand-kicker">Ostr-AI · AI Summer School 2026</span>
+          <h1 class="brand-title">Final Project Leaderboard</h1>
+        </div>
+      </a>
+      <nav class="header-actions" aria-label="Actions">
+        <a class="btn btn-ghost" href="/guide">Submission guide</a>
+        <button class="btn btn-primary" id="btn-open-upload" type="button">Upload submission</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="status-bar">
+      <div class="status-left">
+        <span class="stat"><strong id="stat-count">–</strong> submissions</span>
+        <span class="stat-sep" aria-hidden="true">·</span>
+        <span class="stat">updated <strong id="stat-updated">–</strong></span>
+      </div>
+      <div class="status-right my-status" id="my-status" aria-live="polite">
+        <!-- filled by app.js: "You have not submitted yet" or "Your submission: …" with Edit / Delete -->
+      </div>
+    </section>
+
+    <section class="table-card" aria-labelledby="table-caption">
+      <h2 id="table-caption" class="visually-hidden">Leaderboard</h2>
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Leaderboard table (scrolls horizontally on small screens)">
+        <table class="leaderboard" id="leaderboard">
+          <thead>
+            <tr>
+              <th scope="col" class="col-rank" data-key="rank" aria-sort="ascending">
+                <button type="button" class="sort-btn"><span>#</span><span class="sort-icon" aria-hidden="true"></span></button>
+              </th>
+              <th scope="col" data-key="name" aria-sort="none">
+                <button type="button" class="sort-btn"><span>Name</span><span class="sort-icon" aria-hidden="true"></span></button>
+              </th>
+              <th scope="col" data-key="surname" aria-sort="none">
+                <button type="button" class="sort-btn"><span>Surname</span><span class="sort-icon" aria-hidden="true"></span></button>
+              </th>
+              <th scope="col" class="num" data-key="metric" aria-sort="none">
+                <button type="button" class="sort-btn"><span id="metric-header">Metric</span><span class="sort-icon" aria-hidden="true"></span></button>
+              </th>
+              <th scope="col" class="num" data-key="train_time_s" aria-sort="none">
+                <button type="button" class="sort-btn"><span>Train time (s)</span><span class="sort-icon" aria-hidden="true"></span></button>
+              </th>
+              <th scope="col" class="num" data-key="test_time_s" aria-sort="none">
+                <button type="button" class="sort-btn"><span>Test time (s)</span><span class="sort-icon" aria-hidden="true"></span></button>
+              </th>
+              <th scope="col" class="col-date" data-key="submitted_at" aria-sort="none">
+                <button type="button" class="sort-btn"><span>Submitted</span><span class="sort-icon" aria-hidden="true"></span></button>
+              </th>
+            </tr>
+          </thead>
+          <tbody id="leaderboard-body">
+            <tr class="placeholder-row"><td colspan="7">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="table-footnote" id="table-footnote"></p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <span>Ostr-AI · AI Summer School 2026, Ostrava</span>
+      <span class="footer-sep" aria-hidden="true">·</span>
+      <a href="/examples/submission.csv">submission.csv</a>
+      <span class="footer-sep" aria-hidden="true">·</span>
+      <a href="/examples/submission.json">submission.json</a>
+      <span class="footer-sep" aria-hidden="true">·</span>
+      <a href="/guide">Submission guide</a>
+    </div>
+  </footer>
+
+  <!-- Upload / edit dialog -->
+  <dialog id="upload-dialog" class="dialog" aria-labelledby="upload-title">
+    <form method="dialog" class="dialog-form" id="upload-form">
+      <header class="dialog-header">
+        <h2 id="upload-title">Upload submission</h2>
+        <button type="button" class="icon-btn" id="btn-close-upload" aria-label="Close">&times;</button>
+      </header>
+
+      <p class="dialog-hint">
+        Upload a <code>.csv</code> or <code>.json</code> file with exactly one row:
+        <code>name, surname, metric, train_time_s, test_time_s</code>.
+        Templates: <a href="/examples/submission.csv">CSV</a> · <a href="/examples/submission.json">JSON</a>
+        · <a href="/guide" target="_blank" rel="noopener">guide</a>.
+      </p>
+
+      <label class="dropzone" id="dropzone" for="file-input">
+        <input type="file" id="file-input" class="visually-hidden" accept=".csv,.json,text/csv,application/json">
+        <span class="dropzone-icon" aria-hidden="true">⬆</span>
+        <span class="dropzone-text"><strong>Choose a file</strong> or drag &amp; drop it here</span>
+        <span class="dropzone-file" id="dropzone-file"></span>
+      </label>
+
+      <div id="validation-box" class="validation" role="alert" hidden></div>
+
+      <div id="preview-box" class="preview" hidden>
+        <h3>Parsed submission</h3>
+        <dl class="preview-grid" id="preview-grid"></dl>
+      </div>
+
+      <footer class="dialog-footer">
+        <span class="dialog-note" id="dialog-note"></span>
+        <div class="dialog-buttons">
+          <button type="button" class="btn btn-ghost" id="btn-cancel-upload">Cancel</button>
+          <button type="button" class="btn btn-primary" id="btn-submit-upload" disabled>Submit</button>
+        </div>
+      </footer>
+    </form>
+  </dialog>
+
+  <!-- Delete confirmation dialog -->
+  <dialog id="delete-dialog" class="dialog dialog-small" aria-labelledby="delete-title">
+    <form method="dialog" class="dialog-form">
+      <header class="dialog-header">
+        <h2 id="delete-title">Delete your submission?</h2>
+      </header>
+      <p class="dialog-hint">This removes your row from the leaderboard. You can upload a new file at any time.</p>
+      <footer class="dialog-footer">
+        <span></span>
+        <div class="dialog-buttons">
+          <button type="button" class="btn btn-ghost" id="btn-cancel-delete">Cancel</button>
+          <button type="button" class="btn btn-danger" id="btn-confirm-delete">Delete</button>
+        </div>
+      </footer>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status"></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+# runtime database (NoSQL document store, created on first run)
+data/
+# tokens written by seed_demo.py
+seed_tokens.txt
+__pycache__/
+*.pyc
+.venv/
+data/*.lock
+# organiser key written by deploy/deploy_pythonanywhere.py
+deploy/.admin_key
