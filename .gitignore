@@ -8,3 +8,4 @@ __pycache__/
 data/*.lock
 # organiser key written by deploy/deploy_pythonanywhere.py
 deploy/.admin_key
+deploy/.pa_token

@@ -135,7 +135,14 @@ def main() -> int:
     args = ap.parse_args()
 
     username = args.username or input("PythonAnywhere username: ").strip()
-    token = args.token or getpass.getpass("PythonAnywhere API token (input hidden): ").strip()
+    token_file = ROOT / "deploy" / ".pa_token"
+    token = args.token or (token_file.read_text().strip() if token_file.exists() else "")
+    if not token:
+        try:
+            token = getpass.getpass("PythonAnywhere API token (input hidden): ").strip()
+        except (EOFError, OSError):
+            sys.exit("No terminal for the token prompt. Save the token once with:\n"
+                     f"  echo YOUR_TOKEN > {token_file}\nand re-run; it will be remembered.")
     if not username or not token:
         sys.exit("Username and API token are required.")
 
@@ -153,6 +160,12 @@ def main() -> int:
             break
     if pa is None:
         sys.exit("Could not authenticate on www/eu.pythonanywhere.com — check the username and API token.")
+    if not token_file.exists() or token_file.read_text().strip() != token:
+        token_file.write_text(token + "\n")
+        try:
+            os.chmod(token_file, 0o600)
+        except OSError:
+            pass
     host_key = next(k for k, v in HOSTS.items() if v == pa.base)
     domain = f"{username}.pythonanywhere.com" if host_key != "eu" else f"{username}.eu.pythonanywhere.com"
     if args.api_base:
