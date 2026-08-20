@@ -331,10 +331,13 @@ def admin_delete_submission(submission_id: str):
 
 
 @app.after_request
-def no_cache_for_api(response):
+def cache_headers(response):
     if request.path.startswith("/api/"):
         response.headers["Cache-Control"] = "no-store"
         response.headers["Vary"] = "X-Owner-Token"
+    elif request.path.startswith("/static/"):
+        # URLs carry a content-hash ?v=..., so long caching is safe
+        response.headers.setdefault("Cache-Control", "public, max-age=86400")
     return response
 
 
@@ -353,14 +356,35 @@ def api_error(err):
 # ----------------------------------------------------------------------------
 # Static front-end
 # ----------------------------------------------------------------------------
+def _asset_version() -> str:
+    """Content hash of the front-end assets, appended to their URLs (?v=...) so
+    browsers can cache aggressively yet always pick up new versions."""
+    h = hashlib.sha256()
+    for f in sorted(STATIC_DIR.glob("*")):
+        if f.is_file() and f.suffix != ".html":
+            h.update(f.name.encode())
+            h.update(f.read_bytes())
+    return h.hexdigest()[:10]
+
+
+ASSET_VERSION = _asset_version()
+
+
+def _serve_html(filename: str):
+    html = (STATIC_DIR / filename).read_text(encoding="utf-8").replace("__V__", ASSET_VERSION)
+    resp = app.response_class(html, mimetype="text/html")
+    resp.headers["Cache-Control"] = "no-cache"   # always revalidate the page itself
+    return resp
+
+
 @app.get("/")
 def index():
-    return send_from_directory(STATIC_DIR, "index.html")
+    return _serve_html("index.html")
 
 
 @app.get("/guide")
 def guide():
-    return send_from_directory(STATIC_DIR, "guide.html")
+    return _serve_html("guide.html")
 
 
 @app.get("/static/<path:filename>")
