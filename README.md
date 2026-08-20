@@ -8,8 +8,8 @@ the table updates live and can be sorted by any column.
 
 ## Features
 
-- **Sortable table** — rank, Name, Metric, Train time (s), Test time (s), Submitted.
-  Rank is computed from the metric (ties broken by test time, then train time).
+- **Sortable table** — rank, Name, Metric, Test time (s), Submitted.
+  Rank is computed from the metric (ties broken by test time).
 - **Upload / edit / delete** — the file is parsed and validated **in the browser**
   (required columns, numeric types, exactly one row, friendly error messages) and
   shown as a preview before it is sent. The server re-validates defensively.

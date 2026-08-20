@@ -55,9 +55,6 @@
               <th scope="col" class="num" data-key="metric" aria-sort="none">
                 <button type="button" class="sort-btn"><span id="metric-header">Metric</span><span class="sort-icon" aria-hidden="true"></span></button>
               </th>
-              <th scope="col" class="num" data-key="train_time_s" aria-sort="none">
-                <button type="button" class="sort-btn"><span>Train time (s)</span><span class="sort-icon" aria-hidden="true"></span></button>
-              </th>
               <th scope="col" class="num" data-key="test_time_s" aria-sort="none">
                 <button type="button" class="sort-btn"><span>Test time (s)</span><span class="sort-icon" aria-hidden="true"></span></button>
               </th>
@@ -67,7 +64,7 @@
             </tr>
           </thead>
           <tbody id="leaderboard-body">
-            <tr class="placeholder-row"><td colspan="6">Loading…</td></tr>
+            <tr class="placeholder-row"><td colspan="5">Loading…</td></tr>
           </tbody>
         </table>
       </div>
@@ -97,7 +94,7 @@
 
       <p class="dialog-hint">
         Upload a <code>.csv</code> or <code>.json</code> file with exactly one row:
-        <code>name, metric, train_time_s, test_time_s</code>.
+        <code>name, metric, test_time_s</code>.
         Templates: <a href="/examples/submission.csv">CSV</a> · <a href="/examples/submission.json">JSON</a>
         · <a href="/guide" target="_blank" rel="noopener">guide</a>.
       </p>

@@ -11,21 +11,20 @@ exactly what to fix.
 |----------------|----------------------|------------------------------------------|
 | `name`         | text, max 80 chars   | your name                                |
 | `metric`       | number               | your final score on the test set         |
-| `train_time_s` | number, ≥ 0          | training wall-clock time in **seconds**  |
 | `test_time_s`  | number, ≥ 0          | inference time on the test set, seconds  |
 
-- All four columns are required, no other columns are allowed, and the file
+- All three columns are required, no other columns are allowed, and the file
   must contain exactly **one** data row.
 - Numbers use a dot as the decimal separator (`0.93`, not `0,93`) and no
   thousands separators (`1250`, not `1,250`).
 - Column names are case-insensitive; the names shown in the table
-  (`Name`, `Metric`, `Train time (s)`, `Test time (s)`) are accepted too.
+  (`Name`, `Metric`, `Test time (s)`) are accepted too.
 
 ## CSV format
 
 ```csv
-name,metric,train_time_s,test_time_s
-Jane Doe,0.9312,184.5,2.37
+name,metric,test_time_s
+Jane Doe,0.9312,2.37
 ```
 
 ## JSON format
@@ -34,7 +33,6 @@ Jane Doe,0.9312,184.5,2.37
 {
   "name": "Jane Doe",
   "metric": 0.9312,
-  "train_time_s": 184.5,
   "test_time_s": 2.37
 }
 ```

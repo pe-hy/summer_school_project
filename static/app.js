@@ -22,13 +22,12 @@
   };
 
   // Keep in sync with app.py (validate_entry) and submit_readme.md
-  const FIELDS = ["name", "metric", "train_time_s", "test_time_s"];
+  const FIELDS = ["name", "metric", "test_time_s"];
   const STRING_FIELDS = ["name"];
-  const NUMBER_FIELDS = ["metric", "train_time_s", "test_time_s"];
-  const NON_NEGATIVE_FIELDS = ["train_time_s", "test_time_s"];
+  const NUMBER_FIELDS = ["metric", "test_time_s"];
+  const NON_NEGATIVE_FIELDS = ["test_time_s"];
   const FIELD_LABELS = {
-    name: "Name", metric: CONFIG.METRIC_LABEL,
-    train_time_s: "Train time (s)", test_time_s: "Test time (s)",
+    name: "Name", metric: CONFIG.METRIC_LABEL, test_time_s: "Test time (s)",
   };
 
   const TOKEN_KEY = "ostrai_owner_token";
@@ -142,7 +141,7 @@
   // ---------------------------------------------------------------------------
   // Parsing: CSV / JSON  ->  plain object with the 5 canonical keys
   // ---------------------------------------------------------------------------
-  // "Train time (s)", "train_time_s", "TRAIN-TIME-S" all normalize to "traintimes"
+  // "Test time (s)", "test_time_s", "TEST-TIME-S" all normalize to "testtimes"
   const stripBOM = (s) => s.replace(/^\uFEFF/, "");
   const normalizeHeader = (h) => stripBOM(String(h)).toLowerCase().replace(/[^a-z0-9]/g, "");
   const CANONICAL_BY_NORMALIZED = Object.fromEntries(FIELDS.map((f) => [normalizeHeader(f), f]));
@@ -233,7 +232,7 @@
       data = data[0];
     }
     if (data === null || typeof data !== "object" || Array.isArray(data)) {
-      return { errors: ["The JSON must be an object with the keys name, metric, train_time_s, test_time_s."] };
+      return { errors: ["The JSON must be an object with the keys name, metric, test_time_s."] };
     }
     const errors = [];
     const obj = {};
@@ -330,7 +329,6 @@
     const sorted = [...rows].sort((a, b) =>
       dir * (a.metric - b.metric) ||                    // better metric first
       (a.test_time_s - b.test_time_s) ||                // tie-break: faster inference
-      (a.train_time_s - b.train_time_s) ||              // then faster training
       String(a.submitted_at).localeCompare(String(b.submitted_at)));  // then earlier submission
     let lastRank = 0;
     return sorted.map((r, i) => {
@@ -396,7 +394,6 @@
       }
       tr.appendChild(nameCell);
       tr.appendChild(td("num", fmtMetric(r.metric)));
-      tr.appendChild(td("num", fmtTime(r.train_time_s)));
       tr.appendChild(td("num", fmtTime(r.test_time_s)));
       const dateCell = td("date", fmtDate(r.submitted_at));
       dateCell.title = r.submitted_at;
@@ -409,7 +406,7 @@
       const active = th.dataset.key === state.sortKey;
       th.setAttribute("aria-sort", active ? (state.sortDir === "asc" ? "ascending" : "descending") : "none");
     }
-    el.footnote.textContent = `Rank is by ${CONFIG.METRIC_LABEL.toLowerCase()} (${CONFIG.METRIC_HIGHER_IS_BETTER ? "higher" : "lower"} is better); equal metrics share a rank and are listed by test time, then train time. Click a column header to sort.`;
+    el.footnote.textContent = `Rank is by ${CONFIG.METRIC_LABEL.toLowerCase()} (${CONFIG.METRIC_HIGHER_IS_BETTER ? "higher" : "lower"} is better); equal metrics share a rank and are listed by test time. Click a column header to sort.`;
   }
 
   function renderMyStatus() {
