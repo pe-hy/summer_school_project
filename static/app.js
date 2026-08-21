@@ -524,11 +524,15 @@
   const fmtTickX = (v) => (v >= 1 ? +v.toPrecision(6) : +v.toPrecision(3)).toString();
 
   const LABEL_H = 13;
-  // Collision-free name placement for the checked points: single downward pass,
-  // bottom overflow pulled back up as a block, side flip at the canvas edge,
-  // hide only when a stack genuinely cannot fit. Loop-free by construction.
-  function placeLabels(points, widthOf, M, iw, ih, width) {
+  // Collision-free name placement: labels avoid OTHER LABELS and EVERY DOT.
+  // Forward pass only moves labels down, reverse pass only moves them up, and
+  // each obstacle can trigger at most once per label (targets are fixed values),
+  // so both passes terminate by construction. A label that cannot fit anywhere
+  // is hidden — its dot keeps the hover tooltip.
+  function placeLabels(points, widthOf, M, iw, ih, width, dots) {
+    const obstacles = dots || points;
     const top = M.t + 10, bottom = M.t + ih - 2;
+    const ASC = 9, DESC = 3, DOT = 7;    // label text box: [ly-ASC, ly+DESC]; dot box: x,y +- DOT
     for (const p of points) {
       const w = widthOf(p);
       p.side = p.x + 9 + w > width - 2 ? -1 : 1;
@@ -539,26 +543,39 @@
       const w = widthOf(p);
       return p.side === 1 ? [p.x + 9, p.x + 9 + w] : [p.x - 9 - w, p.x - 9];
     };
-    const overlaps = (a, b) => {
-      const [a0, a1] = span(a), [b0, b1] = span(b);
-      return a0 < b1 && b0 < a1;
-    };
+    const overlapsX = (p, x0, x1) => { const [s0, s1] = span(p); return s0 < x1 && x0 < s1; };
+    const overlaps = (a, b) => { const [b0, b1] = span(b); return overlapsX(a, b0, b1); };
+    const inDotBand = (p, d) => overlapsX(p, d.x - DOT, d.x + DOT) && p.ly - ASC < d.y + DOT && d.y - DOT < p.ly + DESC;
+
     const pts = [...points].sort((a, b) => a.y - b.y || a.x - b.x);
     pts.forEach((p, i) => {
       p.ly = Math.max(p.y + 4, top);
-      for (let j = 0; j < i; j++) {
-        if (overlaps(p, pts[j]) && p.ly < pts[j].ly + LABEL_H) p.ly = pts[j].ly + LABEL_H;
+      let moved = true, guard = 0;
+      while (moved && ++guard <= obstacles.length + i + 2) {
+        moved = false;
+        for (let j = 0; j < i; j++) {
+          if (overlaps(p, pts[j]) && p.ly < pts[j].ly + LABEL_H) { p.ly = pts[j].ly + LABEL_H; moved = true; }
+        }
+        for (const d of obstacles) {
+          if (inDotBand(p, d)) { p.ly = d.y + DOT + ASC + 0.5; moved = true; }   // clear below the dot
+        }
       }
     });
-    // Reverse pass: clamp to the bottom and propagate the constraint upward.
-    // Labels only ever move up, so this terminates and cannot create overlaps;
-    // a label squeezed above the top edge is hidden (its dot keeps the tooltip).
+    // Reverse pass: clamp to the bottom edge, propagate the constraint upward,
+    // and dodge dots upward too.
     for (let i = pts.length - 1; i >= 0; i--) {
       const p = pts[i];
       p.ly = Math.min(p.ly, bottom);
-      for (let j = i + 1; j < pts.length; j++) {
-        const q = pts[j];
-        if (!q.hideLabel && overlaps(p, q) && p.ly > q.ly - LABEL_H) p.ly = q.ly - LABEL_H;
+      let moved = true, guard = 0;
+      while (moved && ++guard <= obstacles.length + pts.length + 2) {
+        moved = false;
+        for (let j = i + 1; j < pts.length; j++) {
+          const q = pts[j];
+          if (!q.hideLabel && overlaps(p, q) && p.ly > q.ly - LABEL_H) { p.ly = q.ly - LABEL_H; moved = true; }
+        }
+        for (const d of obstacles) {
+          if (inDotBand(p, d)) { p.ly = d.y - DOT - DESC - 0.5; moved = true; }  // clear above the dot
+        }
       }
       if (p.ly < top) { p.hideLabel = true; p.ly = top; }
     }
@@ -685,7 +702,7 @@
     // names for the checked rows: place with estimated widths first…
     const named = L.points.filter((p) => state.labeled.has(p.row.id));
     const estWidth = (p) => 10 + (p.row.name.length + (p.row.mine ? 6 : 0)) * 7;
-    placeLabels(named, estWidth, L.M, L.iw, L.ih, width);
+    placeLabels(named, estWidth, L.M, L.iw, L.ih, width, L.points);
     const labelNodes = new Map();
     for (const p of named) {
       const node = svgEl("text", {
@@ -706,7 +723,7 @@
           const w = node.getComputedTextLength();
           measured.set(p, w > 0 ? w + 9 : estWidth(p));
         }
-        placeLabels(named, (p) => measured.get(p), L.M, L.iw, L.ih, width);
+        placeLabels(named, (p) => measured.get(p), L.M, L.iw, L.ih, width, L.points);
         for (const [p, node] of labelNodes) {
           node.style.display = p.hideLabel ? "none" : "";
           node.setAttribute("x", p.x + 9 * p.side);

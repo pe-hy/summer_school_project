@@ -182,7 +182,7 @@ code {
 .name-cell .badge { margin-left: .5rem; }
 
 /* ---------- name checkboxes (styled, not the native look) ---------- */
-.col-check { width: 2.6rem; }
+.col-check { width: 3rem; }
 td.check { text-align: center; }
 input.name-check {
   appearance: none;
@@ -218,8 +218,9 @@ input.name-check:focus-visible { outline: 3px solid transparent; box-shadow: var
   box-shadow: var(--shadow);
 }
 .table-scroll { overflow: visible; border-radius: calc(var(--radius) - 1px) calc(var(--radius) - 1px) 0 0; }
-.leaderboard { width: 100%; border-collapse: collapse; }
-.leaderboard td.name-cell { overflow-wrap: anywhere; max-width: 18rem; }
+.leaderboard { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.leaderboard td.name-cell { overflow-wrap: anywhere; }
+.leaderboard th.num { width: 8.5rem; }
 .leaderboard th, .leaderboard td { padding: .7rem .9rem; text-align: left; vertical-align: middle; }
 .leaderboard thead th {
   background: var(--navy);
@@ -260,8 +261,8 @@ th[aria-sort="descending"] .sort-icon::after { content: "↓"; }
 .leaderboard tbody tr:hover { background: var(--teal-tint); }
 .leaderboard td.num, .leaderboard th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .leaderboard td.num { font-family: var(--font-mono); font-size: .92rem; }
-.col-rank { width: 4.5rem; }
-.col-date { width: 10rem; }
+.col-rank { width: 4rem; }
+.col-date { width: 11rem; }
 td.rank { font-weight: 700; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
 td.rank .medal { display: inline-block; min-width: 1.8em; text-align: center; border-radius: 999px; padding: .05em .35em; font-weight: 700; }
 td.rank .medal.m1 { background: var(--amber-tint); color: var(--amber-ink); }
