@@ -46,6 +46,7 @@
         <table class="leaderboard" id="leaderboard">
           <thead>
             <tr>
+              <th scope="col" class="col-check"><span class="visually-hidden">Show name on the plot</span></th>
               <th scope="col" class="col-rank" data-key="rank" aria-sort="ascending">
                 <button type="button" class="sort-btn"><span>#</span><span class="sort-icon" aria-hidden="true"></span></button>
               </th>
@@ -64,7 +65,7 @@
             </tr>
           </thead>
           <tbody id="leaderboard-body">
-            <tr class="placeholder-row"><td colspan="5">Loading…</td></tr>
+            <tr class="placeholder-row"><td colspan="6">Loading…</td></tr>
           </tbody>
         </table>
       </div>
@@ -73,8 +74,11 @@
 
     <section class="plot-card" aria-labelledby="plot-title">
       <div class="plot-head">
-        <h2 id="plot-title">Accuracy vs. speed</h2>
-        <p class="plot-sub">Every dot is one submission, hover it (or its row in the table) to see who it is. Top left is where you want to be.</p>
+        <div>
+          <h2 id="plot-title">Accuracy vs. speed</h2>
+          <p class="plot-sub">Every dot is one submission. Tick the boxes in the table to put names on the plot, or hover a dot. Top left is where you want to be.</p>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm" id="btn-label-all" disabled>Show all names</button>
       </div>
       <figure class="plot-figure">
         <div id="plot" class="plot-host"></div>

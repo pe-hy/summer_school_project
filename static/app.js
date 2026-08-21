@@ -45,6 +45,7 @@
     footnote: $("#table-footnote"),
     metricHeader: $("#metric-header"),
     btnOpenUpload: $("#btn-open-upload"),
+    btnLabelAll: $("#btn-label-all"),
     uploadDialog: $("#upload-dialog"),
     uploadTitle: $("#upload-title"),
     btnCloseUpload: $("#btn-close-upload"),
@@ -73,11 +74,13 @@
     sortDir: "asc",
     pending: null,            // validated entry waiting to be submitted
     refreshTimer: null,
+    labeled: new Set(),       // row ids whose names are drawn on the plot (checkboxes)
     refreshSeq: 0,            // ignore responses of older in-flight refreshes
     fileSeq: 0,               // ignore results of superseded file reads
     submitting: false,        // the upload dialog cannot be dismissed while a PUT is in flight
     statusShape: null,        // "mine|storageOk" shape of #my-status, to update text in place
     statusNodes: null,
+    lastTableKey: null,       // skip tbody rebuilds when nothing changed (keeps checkbox focus)
   };
 
   // ---------------------------------------------------------------------------
@@ -380,12 +383,16 @@
 
   function renderTable() {
     const rows = sortRows(state.rows);
+    const key = `${state.sortKey}|${state.sortDir}|` +
+      rows.map((r) => `${r.id},${r.name},${r.metric},${r.avg_time_s},${r.rank},${r.mine ? 1 : 0},${r.submitted_at}`).join(";");
+    if (key === state.lastTableKey) return;
+    state.lastTableKey = key;
     const frag = document.createDocumentFragment();
     if (rows.length === 0) {
       const tr = document.createElement("tr");
       tr.className = "placeholder-row";
       const cell = td(null, "No submissions yet — be the first to upload one.");
-      cell.colSpan = el.headers.length;
+      cell.colSpan = el.headers.length + 1;
       tr.appendChild(cell);
       frag.appendChild(tr);
     }
@@ -393,6 +400,16 @@
       const tr = document.createElement("tr");
       tr.dataset.id = r.id;
       if (r.mine) tr.classList.add("mine");
+      const checkCell = document.createElement("td");
+      checkCell.className = "check";
+      const check = document.createElement("input");
+      check.type = "checkbox";
+      check.className = "name-check";
+      check.checked = state.labeled.has(r.id);
+      check.setAttribute("aria-label", `Show ${r.name} on the plot`);
+      check.addEventListener("change", () => setLabeled(r.id, check.checked));
+      checkCell.appendChild(check);
+      tr.appendChild(checkCell);
       const rankCell = document.createElement("td");
       rankCell.className = "rank";
       const medal = document.createElement("span");
@@ -506,6 +523,47 @@
   }
   const fmtTickX = (v) => (v >= 1 ? +v.toPrecision(6) : +v.toPrecision(3)).toString();
 
+  const LABEL_H = 13;
+  // Collision-free name placement for the checked points: single downward pass,
+  // bottom overflow pulled back up as a block, side flip at the canvas edge,
+  // hide only when a stack genuinely cannot fit. Loop-free by construction.
+  function placeLabels(points, widthOf, M, iw, ih, width) {
+    const top = M.t + 10, bottom = M.t + ih - 2;
+    for (const p of points) {
+      const w = widthOf(p);
+      p.side = p.x + 9 + w > width - 2 ? -1 : 1;
+      if (p.side === -1 && p.x - 9 - w < 2) p.side = 1;
+      p.hideLabel = false;
+    }
+    const span = (p) => {
+      const w = widthOf(p);
+      return p.side === 1 ? [p.x + 9, p.x + 9 + w] : [p.x - 9 - w, p.x - 9];
+    };
+    const overlaps = (a, b) => {
+      const [a0, a1] = span(a), [b0, b1] = span(b);
+      return a0 < b1 && b0 < a1;
+    };
+    const pts = [...points].sort((a, b) => a.y - b.y || a.x - b.x);
+    pts.forEach((p, i) => {
+      p.ly = Math.max(p.y + 4, top);
+      for (let j = 0; j < i; j++) {
+        if (overlaps(p, pts[j]) && p.ly < pts[j].ly + LABEL_H) p.ly = pts[j].ly + LABEL_H;
+      }
+    });
+    // Reverse pass: clamp to the bottom and propagate the constraint upward.
+    // Labels only ever move up, so this terminates and cannot create overlaps;
+    // a label squeezed above the top edge is hidden (its dot keeps the tooltip).
+    for (let i = pts.length - 1; i >= 0; i--) {
+      const p = pts[i];
+      p.ly = Math.min(p.ly, bottom);
+      for (let j = i + 1; j < pts.length; j++) {
+        const q = pts[j];
+        if (!q.hideLabel && overlaps(p, q) && p.ly > q.ly - LABEL_H) p.ly = q.ly - LABEL_H;
+      }
+      if (p.ly < top) { p.hideLabel = true; p.ly = top; }
+    }
+  }
+
   // Pure geometry (no DOM) so it can be unit-tested: points, ticks, label spots.
   function plotLayout(rows, width, height) {
     const M = { l: 58, r: 34, t: 34, b: 48 };
@@ -579,7 +637,8 @@
     }
     plotEmpty.hidden = true;
     const width = Math.max(320, plotHost.clientWidth || 640);
-    const key = width + "|" + rows.map((r) => `${r.id},${r.name},${r.metric},${r.avg_time_s},${r.mine ? 1 : 0}`).join(";");
+    const key = width + "|" + [...state.labeled].sort().join(",") + "|" +
+      rows.map((r) => `${r.id},${r.name},${r.metric},${r.avg_time_s},${r.mine ? 1 : 0}`).join(";");
     if (key === lastPlotKey) return;                          // nothing changed: keep tooltip & focus alive
     if (plotHost.contains(document.activeElement)) return;    // keyboard user inside the plot: retry next refresh
     lastPlotKey = key;
@@ -623,7 +682,29 @@
       svg.appendChild(hit);
       plotIndex.set(p.row.id, { p, dot });
     }
+    // names for the checked rows, placed without overlaps
+    const named = L.points.filter((p) => state.labeled.has(p.row.id));
+    placeLabels(named, (p) => 10 + (p.row.name.length + (p.row.mine ? 6 : 0)) * 7, L.M, L.iw, L.ih, width);
+    for (const p of named) {
+      if (p.hideLabel) continue;
+      svg.appendChild(svgEl("text", {
+        x: p.x + 9 * p.side, y: p.ly,
+        class: "plot-name" + (p.side === -1 ? " left" : "") + (p.row.mine ? " mine" : ""),
+      }, p.row.name + (p.row.mine ? " (you)" : "")));
+    }
     plotHost.replaceChildren(svg);
+  }
+
+  function updateLabelAllButton() {
+    const total = state.rows.length;
+    el.btnLabelAll.disabled = total === 0;
+    el.btnLabelAll.textContent = total > 0 && state.labeled.size === total ? "Hide names" : "Show all names";
+  }
+
+  function setLabeled(id, on) {
+    if (on) state.labeled.add(id); else state.labeled.delete(id);
+    updateLabelAllButton();
+    renderPlot();
   }
 
   // Table row hover spotlights the matching dot (and names it).
@@ -658,6 +739,9 @@
       if (seq !== state.refreshSeq) return;            // a newer refresh already landed
       state.rows = computeRanks(data.submissions || []);
       state.mine = state.rows.find((r) => r.mine) || null;
+      const ids = new Set(state.rows.map((r) => r.id));
+      for (const id of state.labeled) if (!ids.has(id)) state.labeled.delete(id);
+      updateLabelAllButton();
       renderTable();
       renderMyStatus();
       renderStats();
@@ -871,6 +955,17 @@
     }
     el.uploadDialog.addEventListener("cancel", (e) => { if (state.submitting) e.preventDefault(); });   // Escape key
 
+    el.btnLabelAll.addEventListener("click", () => {
+      if (state.labeled.size === state.rows.length && state.rows.length > 0) state.labeled.clear();
+      else state.rows.forEach((r) => state.labeled.add(r.id));
+      updateLabelAllButton();
+      for (const box of el.tbody.querySelectorAll("input.name-check")) {
+        const tr = box.closest("tr[data-id]");
+        if (tr) box.checked = state.labeled.has(tr.dataset.id);
+      }
+      renderPlot();
+    });
+
     // hovering a table row spotlights its dot on the plot
     el.tbody.addEventListener("mouseover", (e) => {
       const tr = e.target.closest("tr[data-id]");
@@ -892,5 +987,5 @@
   scheduleRefresh();
 
   // exposed for debugging / tests in the console
-  window.Leaderboard = { parseSubmissionFile, validateEntry, computeRanks, plotLayout, CONFIG };
+  window.Leaderboard = { parseSubmissionFile, validateEntry, computeRanks, plotLayout, placeLabels, CONFIG };
 })();
