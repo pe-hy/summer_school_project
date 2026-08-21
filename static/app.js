@@ -681,6 +681,8 @@
     svg.appendChild(svgEl("text", { x: 10, y: 16, class: "plot-axis-title plot-axis-title-y" }, `Test ${CONFIG.METRIC_LABEL.toLowerCase()} (%)`));
     svg.appendChild(svgEl("text", { x: L.M.l + L.iw / 2, y: L.height - 8, class: "plot-axis-title" },
       `Average time per example (s)${L.xlog ? " — log scale" : ""}`));
+    const leaderGroup = svgEl("g", {});   // painted before (under) the dots
+    svg.appendChild(leaderGroup);
     plotIndex = new Map();
     for (const p of L.points) {
       const mine = p.row.mine;
@@ -703,14 +705,30 @@
     const named = L.points.filter((p) => state.labeled.has(p.row.id));
     const estWidth = (p) => 10 + (p.row.name.length + (p.row.mine ? 6 : 0)) * 7;
     placeLabels(named, estWidth, L.M, L.iw, L.ih, width, L.points);
+    // A name that had to move away from its dot gets a thin leader line back to it.
+    const applyLabelGeom = (p, node, leader) => {
+      node.style.display = p.hideLabel ? "none" : "";
+      node.setAttribute("x", p.x + 9 * p.side);
+      node.setAttribute("y", p.ly);
+      node.classList.toggle("left", p.side === -1);
+      const displaced = Math.abs(p.ly - 4 - p.y) > 8;
+      if (p.hideLabel || !displaced) { leader.style.display = "none"; return; }
+      leader.style.display = "";
+      leader.setAttribute("x1", p.x + 6 * p.side);
+      leader.setAttribute("y1", p.y + Math.sign(p.ly - 4 - p.y) * 4);
+      leader.setAttribute("x2", p.x + 8 * p.side);
+      leader.setAttribute("y2", p.ly - 4);
+    };
     const labelNodes = new Map();
     for (const p of named) {
       const node = svgEl("text", {
-        x: p.x + 9 * p.side, y: p.ly,
-        class: "plot-name" + (p.side === -1 ? " left" : "") + (p.row.mine ? " mine" : ""),
+        class: "plot-name" + (p.row.mine ? " mine" : ""),
       }, p.row.name + (p.row.mine ? " (you)" : ""));
-      labelNodes.set(p, node);
+      const leader = svgEl("line", { class: "plot-leader" });
+      leaderGroup.appendChild(leader);
+      labelNodes.set(p, { node, leader });
       svg.appendChild(node);
+      applyLabelGeom(p, node, leader);
     }
     plotHost.replaceChildren(svg);
     // …then re-place with the REAL rendered text widths, so names can never
@@ -719,17 +737,12 @@
     if (named.length) {
       try {
         const measured = new Map();
-        for (const [p, node] of labelNodes) {
+        for (const [p, { node }] of labelNodes) {
           const w = node.getComputedTextLength();
           measured.set(p, w > 0 ? w + 9 : estWidth(p));
         }
         placeLabels(named, (p) => measured.get(p), L.M, L.iw, L.ih, width, L.points);
-        for (const [p, node] of labelNodes) {
-          node.style.display = p.hideLabel ? "none" : "";
-          node.setAttribute("x", p.x + 9 * p.side);
-          node.setAttribute("y", p.ly);
-          node.classList.toggle("left", p.side === -1);
-        }
+        for (const [p, { node, leader }] of labelNodes) applyLabelGeom(p, node, leader);
       } catch (_) { /* getComputedTextLength unsupported: estimated layout stands */ }
     }
   }
