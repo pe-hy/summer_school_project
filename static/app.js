@@ -704,7 +704,7 @@
         const measured = new Map();
         for (const [p, node] of labelNodes) {
           const w = node.getComputedTextLength();
-          measured.set(p, w > 0 ? w + 6 : estWidth(p));
+          measured.set(p, w > 0 ? w + 9 : estWidth(p));
         }
         placeLabels(named, (p) => measured.get(p), L.M, L.iw, L.ih, width);
         for (const [p, node] of labelNodes) {
@@ -1007,6 +1007,13 @@
   renderMyStatus();
   refresh({ silent: false });
   scheduleRefresh();
+  // Web fonts load asynchronously: label widths measured against the fallback
+  // font are stale once IBM Plex swaps in, so lay the plot out again then.
+  if (document.fonts) {
+    const remeasure = () => { lastPlotKey = null; renderPlot(); };
+    if (document.fonts.ready && document.fonts.ready.then) document.fonts.ready.then(remeasure);
+    if (document.fonts.addEventListener) document.fonts.addEventListener("loadingdone", remeasure);
+  }
 
   // exposed for debugging / tests in the console
   window.Leaderboard = { parseSubmissionFile, validateEntry, computeRanks, plotLayout, placeLabels, CONFIG };
