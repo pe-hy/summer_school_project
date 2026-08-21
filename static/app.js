@@ -391,6 +391,7 @@
     }
     for (const r of rows) {
       const tr = document.createElement("tr");
+      tr.dataset.id = r.id;
       if (r.mine) tr.classList.add("mine");
       const rankCell = document.createElement("td");
       rankCell.className = "rank";
@@ -537,38 +538,7 @@
       row: r,
       x: xPos(r.avg_time_s),
       y: yPos(r.metric * 100),
-      side: xPos(r.avg_time_s) > M.l + iw * 0.72 ? -1 : 1,   // long labels flip to the left near the right edge
     }));
-    // Label placement — single downward pass (no loops that can spin), then
-    // chains that ran past the bottom are pulled back up as a block.
-    const labelSpan = (p) => {
-      const w = 14 + p.row.name.length * 6.5 + (p.row.mine ? 34 : 0);
-      return p.side === 1 ? [p.x + 8, p.x + 8 + w] : [p.x - 8 - w, p.x - 8];
-    };
-    const overlaps = (a, b) => {
-      const [a0, a1] = labelSpan(a), [b0, b1] = labelSpan(b);
-      return a0 < b1 && b0 < a1;
-    };
-    const LH = 13;                                  // label line height
-    const top = M.t + 10, bottom = M.t + ih - 2;
-    const pts = [...points].sort((a, b) => a.y - b.y || a.x - b.x);
-    pts.forEach((p, i) => {
-      p.ly = Math.max(p.y + 4, top);
-      for (let j = 0; j < i; j++) {
-        if (overlaps(p, pts[j]) && p.ly < pts[j].ly + LH) p.ly = pts[j].ly + LH;
-      }
-    });
-    for (let i = pts.length - 1; i >= 0; i--) {     // pull overflowing stacks back up
-      if (pts[i].ly <= bottom) continue;
-      const chain = [pts[i]];
-      for (let j = i - 1; j >= 0; j--) {
-        const q = pts[j];
-        if (chain.some((c) => overlaps(c, q) && c.ly >= q.ly && c.ly - q.ly <= LH + 0.5)) chain.push(q);
-      }
-      const shift = Math.min(pts[i].ly - bottom, Math.min(...chain.map((c) => c.ly)) - top);
-      if (shift > 0) for (const c of chain) c.ly -= shift;
-      if (pts[i].ly > bottom) pts[i].ly = bottom;   // taller than the plot: overlap beats invisible
-    }
     return { M, iw, ih, width, height, xlog, xTicks, yTicks, xPos, yPos, points };
   }
 
@@ -601,6 +571,7 @@
     const rows = state.rows;
     if (!rows.length) {
       lastPlotKey = "empty";
+      plotIndex = new Map();
       plotHost.replaceChildren();
       plotEmpty.hidden = false;
       hidePlotTip();
@@ -634,24 +605,41 @@
     svg.appendChild(svgEl("text", { x: 10, y: 16, class: "plot-axis-title plot-axis-title-y" }, `Test ${CONFIG.METRIC_LABEL.toLowerCase()} (%)`));
     svg.appendChild(svgEl("text", { x: L.M.l + L.iw / 2, y: L.height - 8, class: "plot-axis-title" },
       `Average time per example (s)${L.xlog ? " — log scale" : ""}`));
+    plotIndex = new Map();
     for (const p of L.points) {
       const mine = p.row.mine;
-      svg.appendChild(svgEl("circle", { cx: p.x, cy: p.y, r: 5, class: "plot-dot" + (mine ? " mine" : "") }));
-      svg.appendChild(svgEl("text", {
-        x: p.x + 9 * p.side, y: p.ly,
-        class: "plot-label" + (p.side === -1 ? " left" : "") + (mine ? " mine" : ""),
-      }, p.row.name + (mine ? " (you)" : "")));
+      const dot = svgEl("circle", { cx: p.x, cy: p.y, r: 5, class: "plot-dot" + (mine ? " mine" : "") });
+      svg.appendChild(dot);
       const hit = svgEl("circle", {
         cx: p.x, cy: p.y, r: 12, class: "plot-hit", tabindex: "0",
         "aria-label": `${p.row.name}: ${fmtNumber(p.row.metric * 100, 2)} percent, ${fmtTime(p.row.avg_time_s)} seconds per example`,
       });
-      hit.addEventListener("pointerenter", () => showPlotTip(p, hit));
-      hit.addEventListener("pointerleave", hidePlotTip);
-      hit.addEventListener("focus", () => showPlotTip(p, hit));
-      hit.addEventListener("blur", hidePlotTip);
+      const over = () => { dot.classList.add("hot"); showPlotTip(p, hit); };
+      const out = () => { dot.classList.remove("hot"); hidePlotTip(); };
+      hit.addEventListener("pointerenter", over);
+      hit.addEventListener("pointerleave", out);
+      hit.addEventListener("focus", over);
+      hit.addEventListener("blur", out);
       svg.appendChild(hit);
+      plotIndex.set(p.row.id, { p, dot });
     }
     plotHost.replaceChildren(svg);
+  }
+
+  // Table row hover spotlights the matching dot (and names it).
+  let plotIndex = new Map();
+  let spotlightId = null;
+  function plotSpotlight(id, on) {
+    if (on && spotlightId === id) return;
+    if (spotlightId) {
+      const prev = plotIndex.get(spotlightId);
+      if (prev) prev.dot.classList.remove("hot");
+    }
+    spotlightId = on ? id : null;
+    const entry = on ? plotIndex.get(id) : null;
+    if (!entry) { hidePlotTip(); return; }
+    entry.dot.classList.add("hot");
+    showPlotTip(entry.p, entry.dot);
   }
 
   let plotResizeTimer = null;
@@ -882,6 +870,13 @@
       dlg.addEventListener("click", (e) => { if (e.target === dlg && !state.submitting) dlg.close(); });
     }
     el.uploadDialog.addEventListener("cancel", (e) => { if (state.submitting) e.preventDefault(); });   // Escape key
+
+    // hovering a table row spotlights its dot on the plot
+    el.tbody.addEventListener("mouseover", (e) => {
+      const tr = e.target.closest("tr[data-id]");
+      if (tr) plotSpotlight(tr.dataset.id, true);
+    });
+    el.tbody.addEventListener("mouseleave", () => plotSpotlight(spotlightId, false));
 
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "visible") refresh();

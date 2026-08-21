@@ -11,7 +11,7 @@ the table updates live and can be sorted by any column.
 - **Sortable table** — rank, Name, Accuracy, Avg time (s) per example, Submitted.
   Rank is computed from the accuracy (ties broken by average time per example).
 - **Accuracy-vs-speed plot** — an SVG scatter under the table (accuracy % against
-  average time per example, log x-axis when the spread is wide), points labeled by name.
+  average time per example, log x-axis when the spread is wide); hovering a point or its table row shows the name.
 - **Upload / edit / delete** — the file is parsed and validated **in the browser**
   (required columns, numeric types, exactly one row, friendly error messages) and
   shown as a preview before it is sent. The server re-validates defensively.
