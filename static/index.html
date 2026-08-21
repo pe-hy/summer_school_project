@@ -55,8 +55,8 @@
               <th scope="col" class="num" data-key="metric" aria-sort="none">
                 <button type="button" class="sort-btn"><span id="metric-header">Metric</span><span class="sort-icon" aria-hidden="true"></span></button>
               </th>
-              <th scope="col" class="num" data-key="test_time_s" aria-sort="none">
-                <button type="button" class="sort-btn"><span>Test time (s)</span><span class="sort-icon" aria-hidden="true"></span></button>
+              <th scope="col" class="num" data-key="avg_time_s" aria-sort="none">
+                <button type="button" class="sort-btn"><span>Avg time (s)</span><span class="sort-icon" aria-hidden="true"></span></button>
               </th>
               <th scope="col" class="col-date" data-key="submitted_at" aria-sort="none">
                 <button type="button" class="sort-btn"><span>Submitted</span><span class="sort-icon" aria-hidden="true"></span></button>
@@ -69,6 +69,18 @@
         </table>
       </div>
       <p class="table-footnote" id="table-footnote"></p>
+    </section>
+
+    <section class="plot-card" aria-labelledby="plot-title">
+      <div class="plot-head">
+        <h2 id="plot-title">Accuracy vs. speed</h2>
+        <p class="plot-sub">Each point is one submission — up and to the left is better.</p>
+      </div>
+      <figure class="plot-figure">
+        <div id="plot" class="plot-host"></div>
+        <p id="plot-empty" class="plot-placeholder">The plot appears with the first submission.</p>
+        <div id="plot-tooltip" class="plot-tooltip" hidden></div>
+      </figure>
     </section>
   </main>
 
@@ -94,7 +106,7 @@
 
       <p class="dialog-hint">
         Upload a <code>.csv</code> or <code>.json</code> file with exactly one row:
-        <code>name, metric, test_time_s</code>.
+        <code>name, metric, avg_time_s</code>.
         Templates: <a href="/examples/submission.csv">CSV</a> · <a href="/examples/submission.json">JSON</a>
         · <a href="/guide" target="_blank" rel="noopener">guide</a>.
       </p>

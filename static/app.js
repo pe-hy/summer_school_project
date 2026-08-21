@@ -13,7 +13,7 @@
   // Configuration
   // ---------------------------------------------------------------------------
   const CONFIG = {
-    METRIC_LABEL: "Metric",          // shown in the column header
+    METRIC_LABEL: "Accuracy",        // shown in the column header and status line
     METRIC_HIGHER_IS_BETTER: true,   // rank #1 = highest metric (set false for loss/error metrics)
     REFRESH_MS: 10000,               // background refresh interval
     MAX_NAME_LEN: 80,
@@ -22,12 +22,12 @@
   };
 
   // Keep in sync with app.py (validate_entry) and submit_readme.md
-  const FIELDS = ["name", "metric", "test_time_s"];
+  const FIELDS = ["name", "metric", "avg_time_s"];
   const STRING_FIELDS = ["name"];
-  const NUMBER_FIELDS = ["metric", "test_time_s"];
-  const NON_NEGATIVE_FIELDS = ["test_time_s"];
+  const NUMBER_FIELDS = ["metric", "avg_time_s"];
+  const NON_NEGATIVE_FIELDS = ["avg_time_s"];
   const FIELD_LABELS = {
-    name: "Name", metric: CONFIG.METRIC_LABEL, test_time_s: "Test time (s)",
+    name: "Name", metric: CONFIG.METRIC_LABEL, avg_time_s: "Avg time (s)",
   };
 
   const TOKEN_KEY = "ostrai_owner_token";
@@ -141,10 +141,17 @@
   // ---------------------------------------------------------------------------
   // Parsing: CSV / JSON  ->  plain object with the 5 canonical keys
   // ---------------------------------------------------------------------------
-  // "Test time (s)", "test_time_s", "TEST-TIME-S" all normalize to "testtimes"
+  // "Avg time (s)", "avg_time_s", "AVG-TIME-S" all normalize to "avgtimes"
   const stripBOM = (s) => s.replace(/^\uFEFF/, "");
   const normalizeHeader = (h) => stripBOM(String(h)).toLowerCase().replace(/[^a-z0-9]/g, "");
-  const CANONICAL_BY_NORMALIZED = Object.fromEntries(FIELDS.map((f) => [normalizeHeader(f), f]));
+  const CANONICAL_BY_NORMALIZED = {
+    ...Object.fromEntries(FIELDS.map((f) => [normalizeHeader(f), f])),
+    accuracy: "metric",                       // "Accuracy" column header
+    avgtimeexamples: "avg_time_s",            // "Avg time / example (s)"
+    avgtimeperexamples: "avg_time_s",
+    averagetimeperexamples: "avg_time_s",
+    averagetimeperexample: "avg_time_s",
+  };
 
   function detectDelimiter(headerLine) {
     let best = ",", bestCount = -1;
@@ -232,7 +239,7 @@
       data = data[0];
     }
     if (data === null || typeof data !== "object" || Array.isArray(data)) {
-      return { errors: ["The JSON must be an object with the keys name, metric, test_time_s."] };
+      return { errors: ["The JSON must be an object with the keys name, metric, avg_time_s."] };
     }
     const errors = [];
     const obj = {};
@@ -283,6 +290,7 @@
         continue;
       }
       if (NON_NEGATIVE_FIELDS.includes(f) && v < 0) { errors.push(`'${f}' must be >= 0.`); continue; }
+      if (f === "metric" && (v < 0 || v > 1)) { errors.push("'metric' must be between 0 and 1 — accuracy as a fraction (93.12 % is 0.9312)."); continue; }
       clean[f] = v;
     }
     return { clean: errors.length ? null : clean, errors };
@@ -311,7 +319,14 @@
     return n.toLocaleString("en-US", { maximumFractionDigits: maxFrac, useGrouping: false });
   };
   const fmtMetric = (x) => fmtNumber(x, 6);
-  const fmtTime = (x) => fmtNumber(x, 3);
+  const fmtTime = (x) => {
+    const n = Number(x);
+    if (!Number.isFinite(n)) return "–";
+    if (n === 0) return "0";
+    if (Math.abs(n) >= 1) return fmtNumber(n, 3);
+    if (Math.abs(n) < 1e-4) return n.toExponential(2);
+    return String(+n.toPrecision(3));   // 0.0021 vs 0.0024 stay distinguishable
+  };
   function fmtDate(iso) {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return "–";
@@ -328,7 +343,7 @@
     const dir = CONFIG.METRIC_HIGHER_IS_BETTER ? -1 : 1;
     const sorted = [...rows].sort((a, b) =>
       dir * (a.metric - b.metric) ||                    // better metric first
-      (a.test_time_s - b.test_time_s) ||                // tie-break: faster inference
+      (a.avg_time_s - b.avg_time_s) ||                  // tie-break: faster inference
       String(a.submitted_at).localeCompare(String(b.submitted_at)));  // then earlier submission
     let lastRank = 0;
     return sorted.map((r, i) => {
@@ -394,7 +409,7 @@
       }
       tr.appendChild(nameCell);
       tr.appendChild(td("num", fmtMetric(r.metric)));
-      tr.appendChild(td("num", fmtTime(r.test_time_s)));
+      tr.appendChild(td("num", fmtTime(r.avg_time_s)));
       const dateCell = td("date", fmtDate(r.submitted_at));
       dateCell.title = r.submitted_at;
       tr.appendChild(dateCell);
@@ -406,7 +421,7 @@
       const active = th.dataset.key === state.sortKey;
       th.setAttribute("aria-sort", active ? (state.sortDir === "asc" ? "ascending" : "descending") : "none");
     }
-    el.footnote.textContent = `Rank is by ${CONFIG.METRIC_LABEL.toLowerCase()} (${CONFIG.METRIC_HIGHER_IS_BETTER ? "higher" : "lower"} is better); equal metrics share a rank and are listed by test time. Click a column header to sort.`;
+    el.footnote.textContent = `Rank is by ${CONFIG.METRIC_LABEL.toLowerCase()} (${CONFIG.METRIC_HIGHER_IS_BETTER ? "higher" : "lower"} is better); equal accuracies share a rank and are listed by average time per example. Click a column header to sort.`;
   }
 
   function renderMyStatus() {
@@ -468,6 +483,183 @@
     el.statUpdated.textContent = fmtClock(new Date());
   }
 
+
+  // ---------------------------------------------------------------------------
+  // Plot: accuracy (%) vs. average time per example — SVG scatter, no libraries
+  // ---------------------------------------------------------------------------
+  const SVG_NS = "http://www.w3.org/2000/svg";
+  const plotHost = $("#plot");
+  const plotEmpty = $("#plot-empty");
+  const plotTooltip = $("#plot-tooltip");
+
+  function niceStep(rough) {
+    const pow = 10 ** Math.floor(Math.log10(rough));
+    for (const m of [1, 2, 5, 10]) if (m * pow >= rough - 1e-12) return m * pow;
+    return 10 * pow;
+  }
+  function linearTicks(min, max, target) {
+    const step = niceStep((max - min) / Math.max(1, target));
+    const out = [];
+    for (let v = Math.ceil(min / step) * step; v <= max + step * 1e-9; v += step) out.push(+v.toPrecision(12));
+    return out;
+  }
+  const fmtTickX = (v) => (v >= 1 ? +v.toPrecision(6) : +v.toPrecision(3)).toString();
+
+  // Pure geometry (no DOM) so it can be unit-tested: points, ticks, label spots.
+  function plotLayout(rows, width, height) {
+    const M = { l: 58, r: 34, t: 34, b: 48 };
+    const iw = Math.max(60, width - M.l - M.r);
+    const ih = Math.max(60, height - M.t - M.b);
+    const xs = rows.map((r) => r.avg_time_s);
+    const ys = rows.map((r) => r.metric * 100);
+    const xmin = Math.min(...xs), xmax = Math.max(...xs);
+    const xlog = xmin > 0 && xmax / xmin > 25;      // wide time ranges read better on a log axis
+    let x0, x1, xTicks;
+    if (xlog) {
+      x0 = Math.floor(Math.log10(xmin));
+      x1 = Math.ceil(Math.log10(xmax));
+      if (x1 === x0) x1 += 1;
+      xTicks = [];
+      for (let e = x0; e <= x1; e++) xTicks.push(+(10 ** e).toPrecision(12));
+    } else {
+      x0 = 0;
+      x1 = niceStep(Math.max(xmax, 1e-9) * 1.05);
+      xTicks = linearTicks(0, x1, 5);
+    }
+    const xPos = (v) => M.l + ((xlog ? Math.log10(v) : v) - x0) / (x1 - x0) * iw;
+    let ymin = Math.floor(Math.min(...ys)) - 2, ymax = Math.ceil(Math.max(...ys)) + 2;
+    if (ymax - ymin < 6) { ymin -= 2; ymax += 2; }
+    ymin = Math.max(0, ymin); ymax = Math.min(100, ymax);
+    const yTicks = linearTicks(ymin, ymax, 5);
+    const yPos = (v) => M.t + (1 - (v - ymin) / (ymax - ymin)) * ih;
+
+    const points = rows.map((r) => ({
+      row: r,
+      x: xPos(r.avg_time_s),
+      y: yPos(r.metric * 100),
+      side: xPos(r.avg_time_s) > M.l + iw * 0.72 ? -1 : 1,   // long labels flip to the left near the right edge
+    }));
+    // Label placement — single downward pass (no loops that can spin), then
+    // chains that ran past the bottom are pulled back up as a block.
+    const labelSpan = (p) => {
+      const w = 14 + p.row.name.length * 6.5 + (p.row.mine ? 34 : 0);
+      return p.side === 1 ? [p.x + 8, p.x + 8 + w] : [p.x - 8 - w, p.x - 8];
+    };
+    const overlaps = (a, b) => {
+      const [a0, a1] = labelSpan(a), [b0, b1] = labelSpan(b);
+      return a0 < b1 && b0 < a1;
+    };
+    const LH = 13;                                  // label line height
+    const top = M.t + 10, bottom = M.t + ih - 2;
+    const pts = [...points].sort((a, b) => a.y - b.y || a.x - b.x);
+    pts.forEach((p, i) => {
+      p.ly = Math.max(p.y + 4, top);
+      for (let j = 0; j < i; j++) {
+        if (overlaps(p, pts[j]) && p.ly < pts[j].ly + LH) p.ly = pts[j].ly + LH;
+      }
+    });
+    for (let i = pts.length - 1; i >= 0; i--) {     // pull overflowing stacks back up
+      if (pts[i].ly <= bottom) continue;
+      const chain = [pts[i]];
+      for (let j = i - 1; j >= 0; j--) {
+        const q = pts[j];
+        if (chain.some((c) => overlaps(c, q) && c.ly >= q.ly && c.ly - q.ly <= LH + 0.5)) chain.push(q);
+      }
+      const shift = Math.min(pts[i].ly - bottom, Math.min(...chain.map((c) => c.ly)) - top);
+      if (shift > 0) for (const c of chain) c.ly -= shift;
+      if (pts[i].ly > bottom) pts[i].ly = bottom;   // taller than the plot: overlap beats invisible
+    }
+    return { M, iw, ih, width, height, xlog, xTicks, yTicks, xPos, yPos, points };
+  }
+
+  function svgEl(tag, attrs, text) {
+    const node = document.createElementNS(SVG_NS, tag);
+    for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  function showPlotTip(p, target) {
+    const box = plotTooltip.offsetParent || plotTooltip.parentElement;
+    const boxRect = box.getBoundingClientRect();
+    const r = target.getBoundingClientRect();          // handles svg scaling & padding
+    const cx = r.left + r.width / 2 - boxRect.left;
+    const cy = r.top + r.height / 2 - boxRect.top;
+    plotTooltip.textContent = `${p.row.name} — ${fmtNumber(p.row.metric * 100, 2)} %, ${fmtTime(p.row.avg_time_s)} s/example`;
+    plotTooltip.hidden = false;
+    const half = plotTooltip.offsetWidth / 2;
+    plotTooltip.style.left = `${Math.min(Math.max(cx, half + 2), boxRect.width - half - 2)}px`;
+    plotTooltip.style.top = `${cy}px`;
+    plotTooltip.classList.toggle("below", cy < 46);
+  }
+  function hidePlotTip() { plotTooltip.hidden = true; }
+
+  let lastPlotKey = null;
+
+  function renderPlot() {
+    if (!plotHost) return;
+    const rows = state.rows;
+    if (!rows.length) {
+      lastPlotKey = "empty";
+      plotHost.replaceChildren();
+      plotEmpty.hidden = false;
+      hidePlotTip();
+      return;
+    }
+    plotEmpty.hidden = true;
+    const width = Math.max(320, plotHost.clientWidth || 640);
+    const key = width + "|" + rows.map((r) => `${r.id},${r.name},${r.metric},${r.avg_time_s},${r.mine ? 1 : 0}`).join(";");
+    if (key === lastPlotKey) return;                          // nothing changed: keep tooltip & focus alive
+    if (plotHost.contains(document.activeElement)) return;    // keyboard user inside the plot: retry next refresh
+    lastPlotKey = key;
+    hidePlotTip();
+    const height = Math.round(Math.min(400, Math.max(280, width * 0.42)));
+    const L = plotLayout(rows, width, height);
+    const svg = svgEl("svg", {
+      viewBox: `0 0 ${width} ${height}`, height, role: "group",
+      "aria-label": `${CONFIG.METRIC_LABEL} versus average time per example — the same data as the table above.`,
+    });
+    svg.style.width = "100%";
+    for (const t of L.yTicks) {
+      const y = L.yPos(t);
+      svg.appendChild(svgEl("line", { x1: L.M.l, x2: L.M.l + L.iw, y1: y, y2: y, class: "plot-grid" }));
+      svg.appendChild(svgEl("text", { x: L.M.l - 8, y: y + 3.5, class: "plot-tick plot-tick-y" }, String(t)));
+    }
+    for (const t of L.xTicks) {
+      const x = L.xPos(t);
+      svg.appendChild(svgEl("line", { x1: x, x2: x, y1: L.M.t, y2: L.M.t + L.ih, class: "plot-grid" }));
+      svg.appendChild(svgEl("text", { x, y: L.M.t + L.ih + 16, class: "plot-tick" }, fmtTickX(t)));
+    }
+    svg.appendChild(svgEl("line", { x1: L.M.l, x2: L.M.l + L.iw, y1: L.M.t + L.ih, y2: L.M.t + L.ih, class: "plot-axis" }));
+    svg.appendChild(svgEl("text", { x: 10, y: 16, class: "plot-axis-title plot-axis-title-y" }, `Test ${CONFIG.METRIC_LABEL.toLowerCase()} (%)`));
+    svg.appendChild(svgEl("text", { x: L.M.l + L.iw / 2, y: L.height - 8, class: "plot-axis-title" },
+      `Average time per example (s)${L.xlog ? " — log scale" : ""}`));
+    for (const p of L.points) {
+      const mine = p.row.mine;
+      svg.appendChild(svgEl("circle", { cx: p.x, cy: p.y, r: 5, class: "plot-dot" + (mine ? " mine" : "") }));
+      svg.appendChild(svgEl("text", {
+        x: p.x + 9 * p.side, y: p.ly,
+        class: "plot-label" + (p.side === -1 ? " left" : "") + (mine ? " mine" : ""),
+      }, p.row.name + (mine ? " (you)" : "")));
+      const hit = svgEl("circle", {
+        cx: p.x, cy: p.y, r: 12, class: "plot-hit", tabindex: "0",
+        "aria-label": `${p.row.name}: ${fmtNumber(p.row.metric * 100, 2)} percent, ${fmtTime(p.row.avg_time_s)} seconds per example`,
+      });
+      hit.addEventListener("pointerenter", () => showPlotTip(p, hit));
+      hit.addEventListener("pointerleave", hidePlotTip);
+      hit.addEventListener("focus", () => showPlotTip(p, hit));
+      hit.addEventListener("blur", hidePlotTip);
+      svg.appendChild(hit);
+    }
+    plotHost.replaceChildren(svg);
+  }
+
+  let plotResizeTimer = null;
+  window.addEventListener("resize", () => {
+    clearTimeout(plotResizeTimer);
+    plotResizeTimer = setTimeout(renderPlot, 150);
+  });
+
   // ---------------------------------------------------------------------------
   // Data loading
   // ---------------------------------------------------------------------------
@@ -481,6 +673,7 @@
       renderTable();
       renderMyStatus();
       renderStats();
+      renderPlot();
     } catch (err) {
       if (seq !== state.refreshSeq) return;
       if (!silent) showToast(`Could not load the leaderboard: ${err.message}`, "error");
@@ -704,5 +897,5 @@
   scheduleRefresh();
 
   // exposed for debugging / tests in the console
-  window.Leaderboard = { parseSubmissionFile, validateEntry, computeRanks, CONFIG };
+  window.Leaderboard = { parseSubmissionFile, validateEntry, computeRanks, plotLayout, CONFIG };
 })();

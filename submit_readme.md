@@ -10,21 +10,21 @@ exactly what to fix.
 | Column         | Type                 | Meaning                                  |
 |----------------|----------------------|------------------------------------------|
 | `name`         | text, max 80 chars   | your name                                |
-| `metric`       | number               | your final score on the test set         |
-| `test_time_s`  | number, ≥ 0          | inference time on the test set, seconds  |
+| `metric`       | number, 0–1          | your test accuracy (e.g. `0.9312`)       |
+| `avg_time_s`   | number, ≥ 0          | **average** inference time **per test example**, in seconds |
 
 - All three columns are required, no other columns are allowed, and the file
   must contain exactly **one** data row.
 - Numbers use a dot as the decimal separator (`0.93`, not `0,93`) and no
   thousands separators (`1250`, not `1,250`).
 - Column names are case-insensitive; the names shown in the table
-  (`Name`, `Metric`, `Test time (s)`) are accepted too.
+  (`Name`, `Accuracy`, `Avg time (s)`) are accepted too.
 
 ## CSV format
 
 ```csv
-name,metric,test_time_s
-Jane Doe,0.9312,2.37
+name,metric,avg_time_s
+Jane Doe,0.9312,0.0023
 ```
 
 ## JSON format
@@ -33,7 +33,7 @@ Jane Doe,0.9312,2.37
 {
   "name": "Jane Doe",
   "metric": 0.9312,
-  "test_time_s": 2.37
+  "avg_time_s": 0.0023
 }
 ```
 
@@ -54,5 +54,7 @@ upload from another browser or a namesake — in both cases ask an organiser.
 
 - Extra or misspelt columns (`score` instead of `metric`).
 - More than one data row — submit only your final run.
+- Accuracy as a percentage (`93.12`) — submit the fraction (`0.9312`).
+- Total test-set time instead of the average — divide by the number of test examples.
 - Times in minutes — convert to seconds.
 - Decimal commas from Excel (`0,93`) — use a dot (`0.93`).

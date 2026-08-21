@@ -1,5 +1,5 @@
 {
   "name": "Jane Doe",
   "metric": 0.9312,
-  "test_time_s": 2.37
+  "avg_time_s": 0.0023
 }

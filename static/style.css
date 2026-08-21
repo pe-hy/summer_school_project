@@ -244,6 +244,48 @@ tr.mine td.name-cell { font-weight: 600; }
 .placeholder-row td { text-align: center; color: var(--ink-muted); padding: 2.5rem 1rem; }
 .table-footnote { margin: 0; padding: .6rem .9rem; font-size: .82rem; color: var(--ink-muted); border-top: 1px solid var(--line); }
 
+/* ---------- plot ---------- */
+.plot-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin-top: 1.2rem;
+}
+.plot-head { padding: 1rem 1.2rem 0; }
+.plot-head h2 { margin: 0; font-family: var(--font-display); font-size: 1.15rem; font-weight: 600; color: var(--navy); }
+.plot-sub { margin: .15rem 0 0; font-size: .85rem; color: var(--ink-muted); }
+.plot-figure { margin: 0; padding: .5rem .9rem .7rem; position: relative; }
+.plot-host svg { display: block; }
+.plot-grid { stroke: var(--line); stroke-width: 1; }
+.plot-axis { stroke: var(--line-strong); stroke-width: 1; }
+.plot-tick { fill: var(--ink-muted); font-size: 11px; text-anchor: middle; font-variant-numeric: tabular-nums; }
+.plot-tick-y { text-anchor: end; }
+.plot-axis-title { fill: var(--ink-muted); font-size: 12px; text-anchor: middle; }
+.plot-axis-title-y { text-anchor: start; }
+.plot-dot { fill: var(--teal-ink); stroke: var(--surface); stroke-width: 2; }
+.plot-dot.mine { fill: var(--amber); stroke: var(--navy); }
+.plot-label { fill: var(--ink); font-size: 11.5px; }
+.plot-label.left { text-anchor: end; }
+.plot-label.mine { font-weight: 700; }
+.plot-hit { fill: transparent; cursor: pointer; }
+.plot-hit:focus-visible { outline: none; stroke: var(--navy); stroke-width: 2.5; }
+.plot-placeholder { margin: 0; padding: 2.2rem 1rem; text-align: center; color: var(--ink-muted); }
+.plot-tooltip.below { transform: translate(-50%, 16px); }
+.plot-tooltip {
+  position: absolute;
+  transform: translate(-50%, -135%);
+  background: var(--navy);
+  color: #fff;
+  font-size: .82rem;
+  padding: .35rem .6rem;
+  border-radius: 6px;
+  pointer-events: none;
+  white-space: nowrap;
+  box-shadow: var(--shadow);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---------- footer ---------- */
 .site-footer {
   margin-top: auto;

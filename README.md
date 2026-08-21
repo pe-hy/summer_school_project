@@ -8,8 +8,10 @@ the table updates live and can be sorted by any column.
 
 ## Features
 
-- **Sortable table** — rank, Name, Metric, Test time (s), Submitted.
-  Rank is computed from the metric (ties broken by test time).
+- **Sortable table** — rank, Name, Accuracy, Avg time (s) per example, Submitted.
+  Rank is computed from the accuracy (ties broken by average time per example).
+- **Accuracy-vs-speed plot** — an SVG scatter under the table (accuracy % against
+  average time per example, log x-axis when the spread is wide), points labeled by name.
 - **Upload / edit / delete** — the file is parsed and validated **in the browser**
   (required columns, numeric types, exactly one row, friendly error messages) and
   shown as a preview before it is sent. The server re-validates defensively.
@@ -74,7 +76,7 @@ It is also rendered at `/guide` on the running site. Templates:
 
 | What                       | Where                                            |
 |----------------------------|--------------------------------------------------|
-| Metric name / direction    | `static/app.js` → `CONFIG.METRIC_LABEL`, `CONFIG.METRIC_HIGHER_IS_BETTER` |
+| Metric name / direction    | `static/app.js` → `CONFIG.METRIC_LABEL` (default "Accuracy"), `CONFIG.METRIC_HIGHER_IS_BETTER` |
 | Refresh interval           | `static/app.js` → `CONFIG.REFRESH_MS`            |
 | Validation rules           | `app.py` → `validate_entry`, `static/app.js` → `validateEntry`, and the limits quoted in `submit_readme.md` (keep all three in sync) |
 | Row cap (anti-abuse)       | `app.py` → `MAX_SUBMISSIONS` (default 500)       |

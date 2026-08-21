@@ -1,2 +1,2 @@
-name,metric,test_time_s
-Jane Doe,0.9312,2.37
+name,metric,avg_time_s
+Jane Doe,0.9312,0.0023

@@ -49,8 +49,8 @@ ADMIN_KEY = os.environ.get("LEADERBOARD_ADMIN_KEY") or None
 # Submission schema (keep in sync with static/app.js and submit_readme.md)
 # ----------------------------------------------------------------------------
 STRING_FIELDS = ("name",)
-NUMBER_FIELDS = ("metric", "test_time_s")
-NON_NEGATIVE_FIELDS = ("test_time_s",)
+NUMBER_FIELDS = ("metric", "avg_time_s")
+NON_NEGATIVE_FIELDS = ("avg_time_s",)
 FIELDS = STRING_FIELDS + NUMBER_FIELDS
 MAX_NAME_LEN = 80
 MAX_ABS_NUMBER = 1e15          # anything bigger is certainly a mistake
@@ -127,22 +127,18 @@ Submission = Query()
 
 
 def _migrate_legacy_rows() -> None:
-    """Rows written by an older version (separate first/last-name fields) are
-    merged into the single 'name' field on startup, so old databases just work."""
+    """Startup schema upkeep. Rows from before the avg-time-per-example schema are
+    REMOVED (their total-test-time value cannot be converted to a per-example
+    average), with a note on stderr so an organiser can ask for a re-upload."""
     for doc in submissions.all():
-        legacy = doc.get("surname")
-        up_to_date = (legacy is None and "train_time_s" not in doc and "person_key" in doc
-                      and doc["person_key"] == unicodedata.normalize("NFKC", doc.get("name", "")).casefold())
-        if up_to_date:
+        if any(k in doc for k in ("surname", "train_time_s", "test_time_s")) or "avg_time_s" not in doc:
+            print(f"NOTE: removing legacy submission {doc.get('name', '?')!r} — the schema changed to "
+                  "average time per example; ask the owner to re-upload.", file=sys.stderr)
+            submissions.remove(doc_ids=[doc.doc_id])
             continue
-        name = " ".join(part for part in (doc.get("name", ""), legacy or "") if part).strip()
-        if not name:
-            continue
-        updated = {k: v for k, v in doc.items() if k not in ("surname", "train_time_s")}
-        updated["name"] = name[:MAX_NAME_LEN]
-        updated["person_key"] = unicodedata.normalize("NFKC", updated["name"]).casefold()
-        submissions.remove(doc_ids=[doc.doc_id])
-        submissions.insert(updated)
+        person = unicodedata.normalize("NFKC", doc.get("name", "")).casefold()
+        if doc.get("person_key") != person:
+            submissions.update({"person_key": person}, doc_ids=[doc.doc_id])
 
 
 _migrate_legacy_rows()
@@ -219,6 +215,9 @@ def validate_entry(data: object) -> tuple[dict | None, list[str]]:
         if field in NON_NEGATIVE_FIELDS and number < 0:
             errors.append(f"'{field}' must be >= 0.")
             continue
+        if field == "metric" and not 0 <= number <= 1:
+            errors.append("'metric' must be between 0 and 1 — accuracy as a fraction (93.12 % is 0.9312).")
+            continue
         clean[field] = number
 
     return (clean, []) if not errors else (None, errors)
@@ -235,7 +234,7 @@ def public_row(doc: dict, owner_hash: str | None) -> dict:
         "id": doc.get("id"),
         "name": doc.get("name", ""),
         "metric": doc.get("metric"),
-        "test_time_s": doc.get("test_time_s"),
+        "avg_time_s": doc.get("avg_time_s"),
         "submitted_at": doc.get("submitted_at", ""),
         "mine": bool(owner_hash) and doc.get("owner_hash") == owner_hash,
     }

@@ -16,17 +16,17 @@ import uuid
 BASE = sys.argv[1].rstrip("/") if len(sys.argv) > 1 else "http://localhost:8000"
 
 DEMO = [
-    ("Alice Nováková", 0.9412, 2.11),
-    ("Bob Svoboda", 0.9275, 1.48),
-    ("Carla Dvořáková", 0.9380, 3.95),
-    ("David Kučera", 0.9012, 0.98),
-    ("Eva Horáková", 0.9412, 2.60),
+    ("Alice Nováková", 0.9412, 0.0211),
+    ("Bob Svoboda", 0.9275, 0.0048),
+    ("Carla Dvořáková", 0.9380, 0.0395),
+    ("David Kučera", 0.9012, 0.0009),
+    ("Eva Horáková", 0.9412, 0.0260),
 ]
 
 with open("seed_tokens.txt", "a", encoding="utf-8") as log:
     for name, metric, test in DEMO:
         token = uuid.uuid4().hex
-        body = json.dumps({"name": name, "metric": metric, "test_time_s": test}).encode()
+        body = json.dumps({"name": name, "metric": metric, "avg_time_s": test}).encode()
         req = urllib.request.Request(
             f"{BASE}/api/submissions/mine", data=body, method="PUT",
             headers={"Content-Type": "application/json", "X-Owner-Token": token},
