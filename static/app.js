@@ -682,17 +682,39 @@
       svg.appendChild(hit);
       plotIndex.set(p.row.id, { p, dot });
     }
-    // names for the checked rows, placed without overlaps
+    // names for the checked rows: place with estimated widths first…
     const named = L.points.filter((p) => state.labeled.has(p.row.id));
-    placeLabels(named, (p) => 10 + (p.row.name.length + (p.row.mine ? 6 : 0)) * 7, L.M, L.iw, L.ih, width);
+    const estWidth = (p) => 10 + (p.row.name.length + (p.row.mine ? 6 : 0)) * 7;
+    placeLabels(named, estWidth, L.M, L.iw, L.ih, width);
+    const labelNodes = new Map();
     for (const p of named) {
-      if (p.hideLabel) continue;
-      svg.appendChild(svgEl("text", {
+      const node = svgEl("text", {
         x: p.x + 9 * p.side, y: p.ly,
         class: "plot-name" + (p.side === -1 ? " left" : "") + (p.row.mine ? " mine" : ""),
-      }, p.row.name + (p.row.mine ? " (you)" : "")));
+      }, p.row.name + (p.row.mine ? " (you)" : ""));
+      labelNodes.set(p, node);
+      svg.appendChild(node);
     }
     plotHost.replaceChildren(svg);
+    // …then re-place with the REAL rendered text widths, so names can never
+    // touch even when the estimate under-measures wide glyphs. Both passes run
+    // in the same task, so only the final layout is ever painted.
+    if (named.length) {
+      try {
+        const measured = new Map();
+        for (const [p, node] of labelNodes) {
+          const w = node.getComputedTextLength();
+          measured.set(p, w > 0 ? w + 6 : estWidth(p));
+        }
+        placeLabels(named, (p) => measured.get(p), L.M, L.iw, L.ih, width);
+        for (const [p, node] of labelNodes) {
+          node.style.display = p.hideLabel ? "none" : "";
+          node.setAttribute("x", p.x + 9 * p.side);
+          node.setAttribute("y", p.ly);
+          node.classList.toggle("left", p.side === -1);
+        }
+      } catch (_) { /* getComputedTextLength unsupported: estimated layout stands */ }
+    }
   }
 
   function updateLabelAllButton() {
