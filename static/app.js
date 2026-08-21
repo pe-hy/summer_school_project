@@ -523,61 +523,48 @@
   }
   const fmtTickX = (v) => (v >= 1 ? +v.toPrecision(6) : +v.toPrecision(3)).toString();
 
-  const LABEL_H = 13;
-  // Collision-free name placement: labels avoid OTHER LABELS and EVERY DOT.
-  // Forward pass only moves labels down, reverse pass only moves them up, and
-  // each obstacle can trigger at most once per label (targets are fixed values),
-  // so both passes terminate by construction. A label that cannot fit anywhere
-  // is hidden — its dot keeps the hover tooltip.
-  function placeLabels(points, widthOf, M, iw, ih, width, dots) {
-    const obstacles = dots || points;
-    const top = M.t + 10, bottom = M.t + ih - 2;
-    const ASC = 9, DESC = 3, DOT = 7;    // label text box: [ly-ASC, ly+DESC]; dot box: x,y +- DOT
-    for (const p of points) {
-      const w = widthOf(p);
-      p.side = p.x + 9 + w > width - 2 ? -1 : 1;
-      if (p.side === -1 && p.x - 9 - w < 2) p.side = 1;
-      p.hideLabel = false;
+  // Around-the-point name placement (cartographic 8-position model).
+  // Every point gets its name in one of 8 slots around ITS OWN dot — right,
+  // left, above, below, then the corners — choosing the first slot that fits
+  // inside the plot and collides with no dot and no other name. Neighbouring
+  // points therefore end up labeled top/bottom/left/right of each other.
+  // The layout covers ALL points and is deterministic, so it is precomputed
+  // when the data loads; checkboxes only toggle visibility.
+  const LABEL_CANDIDATES = ["r", "l", "t", "b", "tr", "br", "tl", "bl"];
+  function labelCandidate(p, cand, w) {
+    switch (cand) {
+      case "r":  return { x: p.x + 9, y: p.y + 4,  a: "start",  bx0: p.x + 9,         bx1: p.x + 9 + w };
+      case "l":  return { x: p.x - 9, y: p.y + 4,  a: "end",    bx0: p.x - 9 - w,     bx1: p.x - 9 };
+      case "t":  return { x: p.x,     y: p.y - 11, a: "middle", bx0: p.x - w / 2,     bx1: p.x + w / 2 };
+      case "b":  return { x: p.x,     y: p.y + 17, a: "middle", bx0: p.x - w / 2,     bx1: p.x + w / 2 };
+      case "tr": return { x: p.x + 7, y: p.y - 9,  a: "start",  bx0: p.x + 7,         bx1: p.x + 7 + w };
+      case "br": return { x: p.x + 7, y: p.y + 15, a: "start",  bx0: p.x + 7,         bx1: p.x + 7 + w };
+      case "tl": return { x: p.x - 7, y: p.y - 9,  a: "end",    bx0: p.x - 7 - w,     bx1: p.x - 7 };
+      default:   return { x: p.x - 7, y: p.y + 15, a: "end",    bx0: p.x - 7 - w,     bx1: p.x - 7 };
     }
-    const span = (p) => {
+  }
+  function placeLabels(points, widthOf, M, iw, ih) {
+    const ASC = 9, DESC = 3, DOT = 7, PAD = 2;
+    const bx0 = M.l + 1, bx1 = M.l + iw - 1, by0 = M.t + 1, by1 = M.t + ih - 1;
+    const boxes = [];   // placed label boxes [x0, x1, y0, y1]
+    const dots = points.map((d) => [d.x - DOT, d.x + DOT, d.y - DOT, d.y + DOT]);
+    const hitsBox = (b, o) => b[0] < o[1] && o[0] < b[1] && b[2] < o[3] && o[2] < b[3];
+    for (const p of [...points].sort((a, b) => a.y - b.y || a.x - b.x)) {
       const w = widthOf(p);
-      return p.side === 1 ? [p.x + 9, p.x + 9 + w] : [p.x - 9 - w, p.x - 9];
-    };
-    const overlapsX = (p, x0, x1) => { const [s0, s1] = span(p); return s0 < x1 && x0 < s1; };
-    const overlaps = (a, b) => { const [b0, b1] = span(b); return overlapsX(a, b0, b1); };
-    const inDotBand = (p, d) => overlapsX(p, d.x - DOT, d.x + DOT) && p.ly - ASC < d.y + DOT && d.y - DOT < p.ly + DESC;
-
-    const pts = [...points].sort((a, b) => a.y - b.y || a.x - b.x);
-    pts.forEach((p, i) => {
-      p.ly = Math.max(p.y + 4, top);
-      let moved = true, guard = 0;
-      while (moved && ++guard <= obstacles.length + i + 2) {
-        moved = false;
-        for (let j = 0; j < i; j++) {
-          if (overlaps(p, pts[j]) && p.ly < pts[j].ly + LABEL_H) { p.ly = pts[j].ly + LABEL_H; moved = true; }
-        }
-        for (const d of obstacles) {
-          if (inDotBand(p, d)) { p.ly = d.y + DOT + ASC + 0.5; moved = true; }   // clear below the dot
-        }
+      p.labelPos = null;
+      p.hideLabel = true;
+      for (const cand of LABEL_CANDIDATES) {
+        const c = labelCandidate(p, cand, w);
+        const box = [c.bx0, c.bx1, c.y - ASC, c.y + DESC];
+        if (box[0] < bx0 || box[1] > bx1 || box[2] < by0 || box[3] > by1) continue;
+        if (dots.some((d) => hitsBox(box, d))) continue;
+        const padded = [box[0] - PAD, box[1] + PAD, box[2] - PAD, box[3] + PAD];
+        if (boxes.some((o) => hitsBox(padded, o))) continue;
+        p.labelPos = c;
+        p.hideLabel = false;
+        boxes.push(box);
+        break;
       }
-    });
-    // Reverse pass: clamp to the bottom edge, propagate the constraint upward,
-    // and dodge dots upward too.
-    for (let i = pts.length - 1; i >= 0; i--) {
-      const p = pts[i];
-      p.ly = Math.min(p.ly, bottom);
-      let moved = true, guard = 0;
-      while (moved && ++guard <= obstacles.length + pts.length + 2) {
-        moved = false;
-        for (let j = i + 1; j < pts.length; j++) {
-          const q = pts[j];
-          if (!q.hideLabel && overlaps(p, q) && p.ly > q.ly - LABEL_H) { p.ly = q.ly - LABEL_H; moved = true; }
-        }
-        for (const d of obstacles) {
-          if (inDotBand(p, d)) { p.ly = d.y - DOT - DESC - 0.5; moved = true; }  // clear above the dot
-        }
-      }
-      if (p.ly < top) { p.hideLabel = true; p.ly = top; }
     }
   }
 
@@ -654,8 +641,7 @@
     }
     plotEmpty.hidden = true;
     const width = Math.max(320, plotHost.clientWidth || 640);
-    const key = width + "|" + [...state.labeled].sort().join(",") + "|" +
-      rows.map((r) => `${r.id},${r.name},${r.metric},${r.avg_time_s},${r.mine ? 1 : 0}`).join(";");
+    const key = width + "|" + rows.map((r) => `${r.id},${r.name},${r.metric},${r.avg_time_s},${r.mine ? 1 : 0}`).join(";");
     if (key === lastPlotKey) return;                          // nothing changed: keep tooltip & focus alive
     if (plotHost.contains(document.activeElement)) return;    // keyboard user inside the plot: retry next refresh
     lastPlotKey = key;
@@ -681,8 +667,6 @@
     svg.appendChild(svgEl("text", { x: 10, y: 16, class: "plot-axis-title plot-axis-title-y" }, `Test ${CONFIG.METRIC_LABEL.toLowerCase()} (%)`));
     svg.appendChild(svgEl("text", { x: L.M.l + L.iw / 2, y: L.height - 8, class: "plot-axis-title" },
       `Average time per example (s)${L.xlog ? " — log scale" : ""}`));
-    const leaderGroup = svgEl("g", {});   // painted before (under) the dots
-    svg.appendChild(leaderGroup);
     plotIndex = new Map();
     for (const p of L.points) {
       const mine = p.row.mine;
@@ -702,52 +686,53 @@
       plotIndex.set(p.row.id, { p, dot });
     }
     // names for the checked rows: place with estimated widths first…
-    const named = L.points.filter((p) => state.labeled.has(p.row.id));
+    // Names are laid out for EVERY point up front (stable, precomputed);
+    // the checkboxes only flip their visibility.
     const estWidth = (p) => 10 + (p.row.name.length + (p.row.mine ? 6 : 0)) * 7;
-    placeLabels(named, estWidth, L.M, L.iw, L.ih, width, L.points);
-    // A name that had to move away from its dot gets a thin leader line back to it.
-    const applyLabelGeom = (p, node, leader) => {
-      node.style.display = p.hideLabel ? "none" : "";
-      node.setAttribute("x", p.x + 9 * p.side);
-      node.setAttribute("y", p.ly);
-      node.classList.toggle("left", p.side === -1);
-      const displaced = Math.abs(p.ly - 4 - p.y) > 8;
-      if (p.hideLabel || !displaced) { leader.style.display = "none"; return; }
-      leader.style.display = "";
-      leader.setAttribute("x1", p.x + 6 * p.side);
-      leader.setAttribute("y1", p.y + Math.sign(p.ly - 4 - p.y) * 4);
-      leader.setAttribute("x2", p.x + 8 * p.side);
-      leader.setAttribute("y2", p.ly - 4);
+    placeLabels(L.points, estWidth, L.M, L.iw, L.ih);
+    const applyLabelGeom = (p, node) => {
+      if (!p.labelPos) { node.style.display = "none"; return; }
+      node.style.display = "";
+      node.setAttribute("x", p.labelPos.x);
+      node.setAttribute("y", p.labelPos.y);
+      node.setAttribute("text-anchor", p.labelPos.a);
     };
     const labelNodes = new Map();
-    for (const p of named) {
+    for (const p of L.points) {
       const node = svgEl("text", {
         class: "plot-name" + (p.row.mine ? " mine" : ""),
       }, p.row.name + (p.row.mine ? " (you)" : ""));
-      const leader = svgEl("line", { class: "plot-leader" });
-      leaderGroup.appendChild(leader);
-      labelNodes.set(p, { node, leader });
+      node.style.visibility = "hidden";           // syncNameVisibility() decides
+      labelNodes.set(p, node);
       svg.appendChild(node);
-      applyLabelGeom(p, node, leader);
+      applyLabelGeom(p, node);
+      const entry = plotIndex.get(p.row.id);
+      if (entry) entry.label = node;
     }
     plotHost.replaceChildren(svg);
-    // …then re-place with the REAL rendered text widths, so names can never
-    // touch even when the estimate under-measures wide glyphs. Both passes run
-    // in the same task, so only the final layout is ever painted.
-    if (named.length) {
+    // Re-place with the real rendered text widths (visibility:hidden still
+    // measures, unlike display:none), then show the checked ones.
+    if (L.points.length) {
       try {
         const measured = new Map();
-        for (const [p, { node }] of labelNodes) {
+        for (const [p, node] of labelNodes) {
           const w = node.getComputedTextLength();
-          measured.set(p, w > 0 ? w + 9 : estWidth(p));
+          measured.set(p, w > 0 ? w + 6 : estWidth(p));
         }
-        placeLabels(named, (p) => measured.get(p), L.M, L.iw, L.ih, width, L.points);
-        for (const [p, { node, leader }] of labelNodes) applyLabelGeom(p, node, leader);
-      } catch (_) { /* getComputedTextLength unsupported: estimated layout stands */ }
+        placeLabels(L.points, (p) => measured.get(p), L.M, L.iw, L.ih);
+        for (const [p, node] of labelNodes) applyLabelGeom(p, node);
+      } catch (_) { /* measurement unsupported: estimated layout stands */ }
+    }
+    syncNameVisibility();
+  }
+
+  function syncNameVisibility() {
+    for (const [id, entry] of plotIndex) {
+      if (entry.label) entry.label.style.visibility = state.labeled.has(id) ? "visible" : "hidden";
     }
   }
 
-  function updateLabelAllButton() {
+    function updateLabelAllButton() {
     const total = state.rows.length;
     el.btnLabelAll.disabled = total === 0;
     el.btnLabelAll.textContent = total > 0 && state.labeled.size === total ? "Hide names" : "Show all names";
@@ -756,7 +741,7 @@
   function setLabeled(id, on) {
     if (on) state.labeled.add(id); else state.labeled.delete(id);
     updateLabelAllButton();
-    renderPlot();
+    syncNameVisibility();
   }
 
   // Table row hover spotlights the matching dot (and names it).
@@ -1015,7 +1000,7 @@
         const tr = box.closest("tr[data-id]");
         if (tr) box.checked = state.labeled.has(tr.dataset.id);
       }
-      renderPlot();
+      syncNameVisibility();
     });
 
     // hovering a table row spotlights its dot on the plot
