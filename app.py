@@ -20,7 +20,6 @@ import contextlib
 import hashlib
 import hmac
 import json
-import math
 import os
 import shutil
 import stat
@@ -56,15 +55,6 @@ NUMBER_FIELDS = ("metric", "latency_ms")
 NON_NEGATIVE_FIELDS = ("latency_ms",)
 BENCHMARKS = ("A", "B")
 FIELDS = STRING_FIELDS + ("benchmark",) + NUMBER_FIELDS
-L_REF_MS, LATENCY_FLOOR_MS, LAMBDA = 1.0, 0.01, 1.0
-
-
-def score(doc: dict) -> float | None:
-    """Ladder score S = 100*accuracy - lambda*log2(L/L_ref). Keep in sync with static/app.js scoreOf()."""
-    try:
-        return 100.0 * doc["metric"] - LAMBDA * math.log2(max(doc["latency_ms"], LATENCY_FLOOR_MS) / L_REF_MS)
-    except (KeyError, TypeError, ValueError):
-        return None
 MAX_NAME_LEN = 80
 MAX_ABS_NUMBER = 1e15          # anything bigger is certainly a mistake
 MAX_SUBMISSIONS = 500          # hard cap on rows (the API is unauthenticated)
@@ -309,7 +299,6 @@ def public_row(doc: dict, owner_hash: str | None) -> dict:
         "benchmark": doc.get("benchmark"),
         "metric": doc.get("metric"),
         "latency_ms": doc.get("latency_ms"),
-        "s": score(doc),
         "person_key": doc.get("person_key"),
         "submitted_at": doc.get("submitted_at", ""),
         "mine": bool(owner_hash) and doc.get("owner_hash") == owner_hash,

@@ -17,9 +17,7 @@
     MAX_NAME_LEN: 80,
     MAX_ABS_NUMBER: 1e15,
     MAX_FILE_BYTES: 64 * 1024,
-    LAMBDA: 1.0,          // keep in sync with app.py
-    L_REF_MS: 1.0,
-    LATENCY_FLOOR_MS: 0.01,
+    LATENCY_FLOOR_MS: 0.01,   // clamp for the log axis only
   };
   const BENCHMARKS = [
     { key: "A", label: "Benchmark A", sub: "77 intents · one service domain", dotClass: "" },
@@ -381,13 +379,7 @@
   // ---------------------------------------------------------------------------
   // Scoring & standings
   // ---------------------------------------------------------------------------
-  // Keep in sync with app.py score(); used for the pre-submit preview only —
-  // ladder rows carry the server-computed `s`.
-  const scoreOf = (e) => 100 * e.metric -
-    CONFIG.LAMBDA * Math.log2(Math.max(e.latency_ms, CONFIG.LATENCY_FLOOR_MS) / CONFIG.L_REF_MS);
-
-  const fmtScore = (s) => (s === null || s === undefined) ? "—" : s.toFixed(2);
-  const fmtPct = (x) => (x * 100).toFixed(2) + " %";
+  const fmtPct = (x) => (x === null || x === undefined) ? "—" : (x * 100).toFixed(2) + " %";
   const fmtLatency = (ms) => {
     const n = Number(ms);
     if (!Number.isFinite(n)) return "—";
@@ -401,39 +393,40 @@
   }
   const fmtClock = (d) => d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
-  // Ranked ladder rows: S desc, then accuracy desc, latency asc, earlier first.
-  // Competition ranking with ties on S rounded to the displayed 2 dp.
+  // Ranked ladder rows: accuracy desc, then latency asc, earlier first.
+  // Competition ranking: ties on accuracy at the displayed 2 dp (%) share a rank.
   function computeRanks(rows) {
     const sorted = [...rows].sort((a, b) =>
-      (b.s - a.s) || (b.metric - a.metric) || (a.latency_ms - b.latency_ms) ||
+      (b.metric - a.metric) || (a.latency_ms - b.latency_ms) ||
       String(a.submitted_at).localeCompare(String(b.submitted_at)));
-    let lastRank = 0, lastS = null;
+    let lastRank = 0, lastKey = null;
     return sorted.map((r, i) => {
-      const sKey = r.s.toFixed(2);
-      const rank = sKey === lastS ? lastRank : i + 1;
-      lastRank = rank; lastS = sKey;
+      const key = (r.metric * 100).toFixed(2);
+      const rank = key === lastKey ? lastRank : i + 1;
+      lastRank = rank; lastKey = key;
       return { ...r, rank };
     });
   }
 
-  // Overall standing: group by person_key; a missing benchmark contributes 0.
+  // Overall standing: group by person_key; the average of the two accuracies,
+  // a missing benchmark contributing 0.
   function overallStandings(rows) {
     const people = new Map();
     for (const r of rows) {
-      const p = people.get(r.person_key) || { pk: r.person_key, name: r.name, mine: false, sA: null, sB: null };
-      p["s" + r.benchmark] = r.s;
+      const p = people.get(r.person_key) || { pk: r.person_key, name: r.name, mine: false, accA: null, accB: null };
+      p["acc" + r.benchmark] = r.metric;
       p.name = r.name;
       p.mine = p.mine || r.mine;
       people.set(r.person_key, p);
     }
     const list = [...people.values()].map((p) => ({
-      ...p, sFinal: ((p.sA ?? 0) + (p.sB ?? 0)) / 2,
-    })).sort((a, b) => (b.sFinal - a.sFinal) || a.name.localeCompare(b.name));
-    let lastRank = 0, lastS = null;
+      ...p, accFinal: ((p.accA ?? 0) + (p.accB ?? 0)) / 2,
+    })).sort((a, b) => (b.accFinal - a.accFinal) || a.name.localeCompare(b.name));
+    let lastRank = 0, lastKey = null;
     return list.map((p, i) => {
-      const sKey = p.sFinal.toFixed(2);
-      const rank = sKey === lastS ? lastRank : i + 1;
-      lastRank = rank; lastS = sKey;
+      const key = (p.accFinal * 100).toFixed(2);
+      const rank = key === lastKey ? lastRank : i + 1;
+      lastRank = rank; lastKey = key;
       return { ...p, rank };
     });
   }
@@ -457,7 +450,7 @@
   const fmtTickX = (v) => String(+(v >= 1 ? v.toPrecision(6) : v.toPrecision(3)));
 
   function plotLayout(rows, width, height) {
-    const M = { l: 58, r: 64, t: 34, b: 48 };
+    const M = { l: 58, r: 34, t: 34, b: 48 };
     const iw = Math.max(60, width - M.l - M.r);
     const ih = Math.max(60, height - M.t - M.b);
     const clampL = (v) => Math.max(v, CONFIG.LATENCY_FLOOR_MS);
@@ -483,40 +476,12 @@
     const yTicks = linearTicks(ymin, ymax, 5);
     const yPos = (v) => M.t + (1 - (v - ymin) / (ymax - ymin)) * ih;
 
-    // Iso-score lines: on this axis pair, S = y - LOG2_10 * lambda * u is a
-    // straight line rising LOG2_10 accuracy points per latency decade.
-    const slope = LOG2_10 * CONFIG.LAMBDA;
-    const sAt = (u, y) => y - slope * u;
-    const sMin = Math.min(sAt(u1, ymin), sAt(u1, ymax), sAt(u0, ymin));
-    const sMax = Math.max(sAt(u0, ymax), sAt(u0, ymin), sAt(u1, ymax));
-    let isoStep = 1;
-    for (const st of [1, 2, 5, 10, 20, 50]) {
-      isoStep = st;
-      if ((sMax - sMin) / st <= 6) break;
-    }
-    const iso = [];
-    for (let S = Math.ceil(sMin / isoStep) * isoStep; S <= sMax + 1e-9; S += isoStep) {
-      // y = S + slope*u; clip to the panel
-      let ua = u0, ub = u1;
-      let ya = S + slope * ua, yb = S + slope * ub;
-      if (yb < ymin || ya > ymax) continue;        // entirely outside
-      if (ya < ymin) { ua = (ymin - S) / slope; ya = ymin; }
-      if (yb > ymax) { ub = (ymax - S) / slope; yb = ymax; }
-      if (ub <= ua) continue;
-      iso.push({
-        s: +S.toPrecision(12),
-        x1: xPosU(ua), y1: yPos(ya),
-        x2: xPosU(ub), y2: yPos(yb),
-        atRight: ub >= u1 - 1e-9,
-      });
-    }
-
     const points = rows.map((r) => ({
       row: r,
       x: xPos(r.latency_ms),
       y: yPos(r.metric * 100),
     }));
-    return { M, iw, ih, width, height, u0, u1, xTicks, yTicks, xPos, yPos, iso, points };
+    return { M, iw, ih, width, height, u0, u1, xTicks, yTicks, xPos, yPos, points };
   }
 
   // Around-the-point name placement (8-position model) — labels avoid other
@@ -577,7 +542,7 @@
     const r = target.getBoundingClientRect();
     const cx = r.left + r.width / 2 - boxRect.left;
     const cy = r.top + r.height / 2 - boxRect.top;
-    P.tip.textContent = `${p.row.name} — S ${fmtScore(p.row.s)}, ${fmtPct(p.row.metric)}, ${fmtLatency(p.row.latency_ms)} ms/ex`;
+    P.tip.textContent = `${p.row.name} — ${fmtPct(p.row.metric)}, ${fmtLatency(p.row.latency_ms)} ms/ex`;
     P.tip.hidden = false;
     const half = P.tip.offsetWidth / 2;
     P.tip.style.left = `${Math.min(Math.max(cx, half + 2), boxRect.width - half - 2)}px`;
@@ -622,12 +587,6 @@
       const x = L.xPos(t);
       svg.appendChild(svgEl("line", { x1: x, x2: x, y1: L.M.t, y2: L.M.t + L.ih, class: "plot-grid" }));
       svg.appendChild(svgEl("text", { x, y: L.M.t + L.ih + 16, class: "plot-tick" }, fmtTickX(t)));
-    }
-    for (const line of L.iso) {
-      svg.appendChild(svgEl("line", { x1: line.x1, y1: line.y1, x2: line.x2, y2: line.y2, class: "plot-iso" }));
-      if (line.atRight) {   // labels live in the right margin; top-clipped lines stay unlabeled
-        svg.appendChild(svgEl("text", { x: line.x2 + 5, y: line.y2 + 3.5, class: "plot-iso-label" }, `S ${line.s}`));
-      }
     }
     svg.appendChild(svgEl("line", { x1: L.M.l, x2: L.M.l + L.iw, y1: L.M.t + L.ih, y2: L.M.t + L.ih, class: "plot-axis" }));
     svg.appendChild(svgEl("text", { x: 10, y: 16, class: "plot-axis-title plot-axis-title-y" }, "Test accuracy (%)"));
@@ -733,7 +692,7 @@
   }
 
   const collator = new Intl.Collator(undefined, { sensitivity: "base", numeric: true });
-  const DEFAULT_DIR = { s: "desc", metric: "desc", latency_ms: "asc", name: "asc", submitted_at: "desc", rank: "asc", sA: "desc", sB: "desc", sFinal: "desc" };
+  const DEFAULT_DIR = { metric: "desc", latency_ms: "asc", name: "asc", submitted_at: "desc", rank: "asc", accA: "desc", accB: "desc", accFinal: "desc" };
 
   function sortView(rows, view) {
     const { sortKey, sortDir } = view;
@@ -776,7 +735,7 @@
     if (dom.tbody.contains(document.activeElement)) return;   // keyboard user inside: retry next poll
     const rows = sortView(state.ladders[bench], view);
     const key = `${view.sortKey}|${view.sortDir}|` +
-      rows.map((r) => `${r.id},${r.name},${r.s},${r.metric},${r.latency_ms},${r.rank},${r.mine ? 1 : 0},${r.submitted_at}`).join(";");
+      rows.map((r) => `${r.id},${r.name},${r.metric},${r.latency_ms},${r.rank},${r.mine ? 1 : 0},${r.submitted_at}`).join(";");
     if (key === view.lastTableKey) return;
     view.lastTableKey = key;
 
@@ -785,7 +744,7 @@
       const tr = document.createElement("tr");
       tr.className = "placeholder-row";
       const cell = td(null, `No results on Benchmark ${bench} yet — be the first to upload one.`);
-      cell.colSpan = 7;
+      cell.colSpan = 6;
       tr.appendChild(cell);
       frag.appendChild(tr);
     }
@@ -813,11 +772,8 @@
         nameCell.appendChild(badge);
       }
       tr.appendChild(nameCell);
-      const sCell = td("num score-cell", fmtScore(r.s));
-      sCell.title = String(r.s);
-      tr.appendChild(sCell);
-      tr.appendChild(td("num", fmtPct(r.metric)));
-      tr.appendChild(td("num", fmtLatency(r.latency_ms) + (r.latency_ms < CONFIG.LATENCY_FLOOR_MS ? " †" : "")));
+      tr.appendChild(td("num score-cell", fmtPct(r.metric)));
+      tr.appendChild(td("num", fmtLatency(r.latency_ms)));
       const dateCell = td("date", fmtDate(r.submitted_at));
       dateCell.title = r.submitted_at;
       tr.appendChild(dateCell);
@@ -833,7 +789,7 @@
     if (el.overallBody.contains(document.activeElement)) return;
     const rows = sortView(state.overall, view);
     const key = `${view.sortKey}|${view.sortDir}|` +
-      rows.map((r) => `${r.pk},${r.name},${r.sA},${r.sB},${r.sFinal},${r.rank},${r.mine ? 1 : 0}`).join(";");
+      rows.map((r) => `${r.pk},${r.name},${r.accA},${r.accB},${r.accFinal},${r.rank},${r.mine ? 1 : 0}`).join(";");
     if (key === view.lastTableKey) return;
     view.lastTableKey = key;
 
@@ -865,11 +821,11 @@
         nameCell.appendChild(badge);
       }
       tr.appendChild(nameCell);
-      const a = td("num" + (r.sA === null ? " missing" : ""), fmtScore(r.sA));
-      const b = td("num" + (r.sB === null ? " missing" : ""), fmtScore(r.sB));
+      const a = td("num" + (r.accA === null ? " missing" : ""), fmtPct(r.accA));
+      const b = td("num" + (r.accB === null ? " missing" : ""), fmtPct(r.accB));
       tr.appendChild(a);
       tr.appendChild(b);
-      tr.appendChild(td("num score-cell", fmtScore(r.sFinal)));
+      tr.appendChild(td("num score-cell", fmtPct(r.accFinal)));
       frag.appendChild(tr);
     }
     el.overallBody.replaceChildren(frag);
@@ -920,8 +876,8 @@
     if (el.myStatus.contains(document.activeElement)) return;
     const mA = state.mine.A, mB = state.mine.B;
     const ov = myOverall();
-    const key = [mA && `${mA.id},${mA.s},${mA.rank}`, mB && `${mB.id},${mB.s},${mB.rank}`,
-      ov && `${ov.rank},${ov.sFinal}`, storageOk].join("|");
+    const key = [mA && `${mA.id},${mA.metric},${mA.rank}`, mB && `${mB.id},${mB.metric},${mB.rank}`,
+      ov && `${ov.rank},${ov.accFinal}`, storageOk].join("|");
     if (key === state.statusKey) return;
     state.statusKey = key;
 
@@ -942,7 +898,7 @@
         slot.appendChild(tag);
         if (m) {
           const txt = document.createElement("span");
-          txt.append(`S ${fmtScore(m.s)} · #${m.rank} `);
+          txt.append(`${fmtPct(m.metric)} · #${m.rank} `);
           slot.appendChild(txt);
           const rep = document.createElement("button");
           rep.type = "button";
@@ -973,7 +929,7 @@
         const line = document.createElement("span");
         line.className = "slot-overall";
         const strong = document.createElement("strong");
-        strong.textContent = `Overall S ${fmtScore(ov.sFinal)} (#${ov.rank})`;
+        strong.textContent = `Overall ${fmtPct(ov.accFinal)} (#${ov.rank})`;
         line.appendChild(strong);
         box.appendChild(line);
       }
@@ -1001,7 +957,7 @@
     try {
       const data = await api("GET", "/api/submissions");
       if (seq !== state.refreshSeq) return;
-      state.rows = (data.submissions || []).filter((r) => typeof r.s === "number");
+      state.rows = (data.submissions || []).filter((r) => typeof r.metric === "number");
       for (const bench of BENCH_KEYS) {
         state.ladders[bench] = computeRanks(state.rows.filter((r) => r.benchmark === bench));
         state.mine[bench] = state.ladders[bench].find((r) => r.mine) || null;
@@ -1112,13 +1068,12 @@
     for (const e of entries) {
       const tag = entries.length > 1 ? `Benchmark ${e.benchmark}: ` : "";
       if (e.latency_ms > 0 && e.latency_ms < 0.05) warnings.push(`${tag}faster than 20 000 examples/s — did you report seconds instead of milliseconds?`);
-      if (e.latency_ms <= CONFIG.LATENCY_FLOOR_MS) warnings.push(`${tag}latency is clipped to the 0.01 ms/example floor when scoring.`);
       if (e.metric > 0.999) warnings.push(`${tag}accuracy above 99.9 % — double-check the fraction.`);
     }
     if (entries.length === 1) {
       const other = BENCH_KEYS.find((b) => b !== entries[0].benchmark);
       if (!state.mine[other]) {
-        warnings.push(`This file covers Benchmark ${entries[0].benchmark} only. Benchmark ${other} still counts as 0 in your overall score — the assignment asks for both.`);
+        warnings.push(`This file covers Benchmark ${entries[0].benchmark} only. Benchmark ${other} still counts as 0 in the overall standing — the assignment asks for both.`);
       }
     }
     return warnings;
@@ -1141,15 +1096,14 @@
         dl.append(dt, dd);
       };
       add("Name", e.name);
-      add("Accuracy", fmtPct(e.metric));
+      add("Accuracy", fmtPct(e.metric), "score-cell");
       add("Latency", `${fmtLatency(e.latency_ms)} ms/example`);
-      add("Score S", fmtScore(scoreOf(e)), "score-cell");
       wrap.appendChild(dl);
       const current = state.mine[e.benchmark];
       if (current) {
         const delta = document.createElement("p");
         delta.className = "preview-delta";
-        delta.textContent = `replaces your current Benchmark ${e.benchmark} result — S ${fmtScore(current.s)} → ${fmtScore(scoreOf(e))}`;
+        delta.textContent = `replaces your current Benchmark ${e.benchmark} result — accuracy ${fmtPct(current.metric)} → ${fmtPct(e.metric)}`;
         wrap.appendChild(delta);
       }
       el.previewEntries.appendChild(wrap);
@@ -1416,5 +1370,5 @@
   }
 
   // exposed for debugging / tests in the console
-  window.Leaderboard = { parseSubmissionFile, validateEntry, computeRanks, overallStandings, plotLayout, placeLabels, scoreOf, CONFIG };
+  window.Leaderboard = { parseSubmissionFile, validateEntry, computeRanks, overallStandings, plotLayout, placeLabels, CONFIG };
 })();

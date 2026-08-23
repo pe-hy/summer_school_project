@@ -12,13 +12,12 @@ benchmarks contained in the file).
 | `name`         | text, max 80 chars   | your name (identical in both entries)            |
 | `benchmark`    | `"A"` or `"B"`       | which benchmark this result belongs to           |
 | `metric`       | number, 0–1          | top-1 accuracy as a fraction (e.g. `0.9312`)     |
-| `latency_ms`   | number, ≥ 0          | your `L`: mean **milliseconds per example**, the median of your three timed runs |
+| `latency_ms`   | number, ≥ 0          | mean **milliseconds per example** on the test set, timed in Google Colab |
 
 - No other fields are allowed; numbers use a dot as the decimal separator.
 - One file may contain **one or two** results — never two for the same benchmark.
-- Your ladder score is `S = 100 × accuracy − log2(latency_ms)`; halving your latency
-  is worth one accuracy point. The overall standing averages S over both benchmarks
-  (a missing benchmark counts as 0).
+- Ladders rank by accuracy; ties go to the faster system. The overall standing is
+  the average of your two accuracies (a missing benchmark counts as 0).
 
 ## CSV format (one or two data rows)
 

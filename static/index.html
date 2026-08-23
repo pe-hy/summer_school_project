@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Ostr-AI 2026 · Leaderboard (provisional)</title>
+  <title>Ostr-AI 2026 · Leaderboard</title>
   <meta name="description" content="Leaderboard of the Efficient Intent Classification Challenge — Ostr-AI AI Summer School 2026">
   <link rel="icon" type="image/png" href="/static/favicon.png?v=__V__">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -31,11 +31,11 @@
 
   <main class="container">
     <section class="intro">
-      <p>Efficient Intent Classification Challenge — two benchmarks, ranked separately and then
-        averaged. Provisional: scored on a random 40&nbsp;% of each graded set; the final standing
-        uses the other 60&nbsp;% and is revealed at the end.</p>
-      <p><code>S = 100 × accuracy − log₂(latency in ms)</code> — halving your time per example is
-        worth exactly one accuracy point. <a href="/assignment">Read the assignment →</a></p>
+      <p>Fast &amp; Accurate Text Classification — two benchmarks, each with its own ladder.
+        Ladders rank by accuracy; ties go to the faster system. The overall standing is the
+        average of your two accuracies (a skipped benchmark counts as 0).</p>
+      <p>Time your runs in Google Colab so the numbers are comparable.
+        <a href="/assignment">Read the assignment →</a></p>
     </section>
 
     <section class="status-bar">
@@ -60,7 +60,7 @@
     <section id="overall" class="board-section">
       <div class="section-head">
         <h2>Overall standing</h2>
-        <p class="section-sub"><code>S_final = (S_A + S_B) / 2</code> · a benchmark without a submission counts as 0</p>
+        <p class="section-sub">Average of your two accuracies · a benchmark without a submission counts as 0</p>
       </div>
       <div class="table-card">
         <div class="table-scroll" tabindex="0" role="region" aria-label="Overall standing table">
@@ -73,14 +73,14 @@
                 <th scope="col" data-key="name" aria-sort="none">
                   <button type="button" class="sort-btn"><span>Name</span><span class="sort-icon" aria-hidden="true"></span></button>
                 </th>
-                <th scope="col" class="num" data-key="sA" aria-sort="none">
-                  <button type="button" class="sort-btn"><span>S — A</span><span class="sort-icon" aria-hidden="true"></span></button>
+                <th scope="col" class="num" data-key="accA" aria-sort="none">
+                  <button type="button" class="sort-btn"><span>Accuracy — A</span><span class="sort-icon" aria-hidden="true"></span></button>
                 </th>
-                <th scope="col" class="num" data-key="sB" aria-sort="none">
-                  <button type="button" class="sort-btn"><span>S — B</span><span class="sort-icon" aria-hidden="true"></span></button>
+                <th scope="col" class="num" data-key="accB" aria-sort="none">
+                  <button type="button" class="sort-btn"><span>Accuracy — B</span><span class="sort-icon" aria-hidden="true"></span></button>
                 </th>
-                <th scope="col" class="num" data-key="sFinal" aria-sort="none">
-                  <button type="button" class="sort-btn"><span>S final</span><span class="sort-icon" aria-hidden="true"></span></button>
+                <th scope="col" class="num" data-key="accFinal" aria-sort="none">
+                  <button type="button" class="sort-btn"><span>Average</span><span class="sort-icon" aria-hidden="true"></span></button>
                 </th>
               </tr>
             </thead>
@@ -89,7 +89,7 @@
             </tbody>
           </table>
         </div>
-        <p class="table-footnote">The final standing of the assignment: the mean of both ladder scores. A missing benchmark contributes 0.</p>
+        <p class="table-footnote">The final standing: the average of your two accuracies. A missing benchmark contributes 0.</p>
       </div>
     </section>
 
@@ -133,9 +133,6 @@
               <th scope="col" data-key="name" aria-sort="none">
                 <button type="button" class="sort-btn"><span>Name</span><span class="sort-icon" aria-hidden="true"></span></button>
               </th>
-              <th scope="col" class="num" data-key="s" aria-sort="none">
-                <button type="button" class="sort-btn"><span>Score S</span><span class="sort-icon" aria-hidden="true"></span></button>
-              </th>
               <th scope="col" class="num" data-key="metric" aria-sort="none">
                 <button type="button" class="sort-btn"><span>Accuracy</span><span class="sort-icon" aria-hidden="true"></span></button>
               </th>
@@ -150,15 +147,14 @@
           <tbody></tbody>
         </table>
       </div>
-      <p class="table-footnote">Ranked by <code>S = 100 × accuracy − log₂(latency in ms)</code>.
-        Halving your time per example is worth exactly one accuracy point. Equal scores share a rank.
-        † latency below 0.01 ms/example is clipped to 0.01 when scoring. Click a column header to sort.</p>
+      <p class="table-footnote">Ranked by accuracy; ties go to the faster system and equal
+        accuracies share a rank. Click a column header to sort.</p>
     </div>
     <div class="plot-card">
       <div class="plot-head">
         <div>
           <h3 class="plot-title">Accuracy vs. latency</h3>
-          <p class="plot-sub">Every dot is one result — dashed lines are equal-score lines.
+          <p class="plot-sub">Every dot is one result — up and to the left is better.
             Tick the boxes in the table to put names on the plots, or hover a dot.</p>
         </div>
         <button type="button" class="btn btn-ghost btn-sm btn-label-all" disabled>Show all names</button>

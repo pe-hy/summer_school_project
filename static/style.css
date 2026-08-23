@@ -298,8 +298,6 @@ tr.mine td.name-cell { font-weight: 600; }
 .plot-dot.mine { fill: var(--amber); stroke: var(--navy); }
 .plot-dot.bench-b { fill: var(--blue); }
 .plot-dot.hot { stroke: var(--navy); stroke-width: 3; }
-.plot-iso { stroke: var(--line); stroke-width: 1; stroke-dasharray: 5 4; }
-.plot-iso-label { fill: var(--ink-muted); font-size: 10.5px; font-variant-numeric: tabular-nums; }
 .plot-name { fill: var(--ink); font-size: 11.5px; }
 .plot-name.left { text-anchor: end; }
 .plot-name.mine { font-weight: 700; }

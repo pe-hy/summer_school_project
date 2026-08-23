@@ -1,9 +1,9 @@
 # Ostr-AI 2026 — Final Project Leaderboard
 
 A small, self-contained leaderboard for the Ostr-AI AI Summer School 2026
-final project — the **Efficient Intent Classification Challenge** (two benchmarks,
-A and B). Students upload a `.csv`/`.json` with one result per benchmark; the
-ladders update live and rank by `S = 100 × accuracy − log₂(latency in ms)`.
+final project — **Fast & Accurate Text Classification** (two benchmarks, A and B).
+Students upload a `.csv`/`.json` with one result per benchmark; the ladders update
+live, rank by accuracy (ties to the faster system), and plot the trade-off.
 
 <p align="center"><img src="static/logo.png" alt="Ostr-AI logo" width="160"></p>
 
@@ -12,9 +12,8 @@ ladders update live and rank by `S = 100 × accuracy − log₂(latency in ms)`.
 - **Two ladders + overall standing** — one section per benchmark (sortable table
   + accuracy-vs-latency scatter with equal-score guide lines), plus an overall
   table of `S_final = (S_A + S_B) / 2`. Sticky section nav, per-benchmark colours.
-- **Workshop scoring** — rank by `S = 100 × accuracy − λ·log₂(L / L_ref)`
-  (λ=1, L_ref=1 ms, floor 0.01 ms), computed server-side; the plot's dashed
-  iso-score diagonals make the trade-off visible.
+- **Workshop scoring** — ladders rank by accuracy with latency as the tie-break;
+  the overall standing is the mean of the two accuracies (missing counts 0).
 - **Assignment on the site** — `/assignment` renders `workshop/ASSIGNMENT.md`
   (instructor notes are git-ignored and never served or deployed).
 - **Upload / edit / delete** — a file holds one result per benchmark (one or two
@@ -83,7 +82,6 @@ It is also rendered at `/guide` on the running site. Templates:
 
 | What                       | Where                                            |
 |----------------------------|--------------------------------------------------|
-| Scoring constants (λ, L_ref, floor) | `app.py` (`LAMBDA`, `L_REF_MS`, `LATENCY_FLOOR_MS`) and `static/app.js` `CONFIG` (keep in sync) |
 | Benchmark names / subtitles | `static/app.js` → `BENCHMARKS`                  |
 | Refresh interval           | `static/app.js` → `CONFIG.REFRESH_MS`            |
 | Validation rules           | `app.py` → `validate_entry`, `static/app.js` → `validateEntry`, and the limits quoted in `submit_readme.md` (keep all three in sync) |
@@ -94,7 +92,7 @@ It is also rendered at `/guide` on the running site. Templates:
 
 | Method   | Path                     | Purpose                                              |
 |----------|--------------------------|------------------------------------------------------|
-| `GET`    | `/api/submissions`       | all rows (with `benchmark`, server-computed `s`, `mine`) |
+| `GET`    | `/api/submissions`       | all rows (with `benchmark` and `mine`)               |
 | `GET`    | `/api/submissions/mine`  | the caller's rows (one per benchmark)                |
 | `PUT`    | `/api/submissions/mine`  | upsert one entry or an array of two (all-or-nothing) |
 | `DELETE` | `/api/submissions/mine`  | delete all the caller's rows                         |
