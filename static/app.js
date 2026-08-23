@@ -41,7 +41,8 @@
     statB: $("#stat-b"),
     statUpdated: $("#stat-updated"),
     myStatus: $("#my-status"),
-    sectionNav: document.querySelectorAll(".section-nav a"),
+    tabs: { A: $("#tab-a"), B: $("#tab-b") },
+    tabCounts: { A: $("#tab-count-a"), B: $("#tab-count-b") },
     overallTable: $("#table-overall"),
     overallBody: $("#table-overall-body"),
     btnOpenUpload: $("#btn-open-upload"),
@@ -564,6 +565,7 @@
       return;
     }
     P.empty.hidden = true;
+    if (!P.host.offsetParent) { P.lastKey = null; return; }   // panel hidden: render on tab switch
     const width = Math.max(320, P.host.clientWidth || 640);
     const key = width + "|" + rows.map((r) => `${r.id},${r.name},${r.metric},${r.latency_ms},${r.mine ? 1 : 0}`).join(";");
     if (key === P.lastKey) { relayoutNames(bench); return; }
@@ -946,6 +948,9 @@
     el.statCount.textContent = String(allPersonKeys().size);
     el.statA.textContent = String(state.ladders.A.length);
     el.statB.textContent = String(state.ladders.B.length);
+    for (const bench of BENCH_KEYS) {
+      el.tabCounts[bench].textContent = state.ladders[bench].length ? `(${state.ladders[bench].length})` : "";
+    }
     el.statUpdated.textContent = fmtClock(new Date());
   }
 
@@ -1284,22 +1289,33 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Section nav scroll-spy (fails safe: anchors still work as plain links)
+  // Benchmark tabs (the Overall table stays pinned above them)
   // ---------------------------------------------------------------------------
-  function initScrollSpy() {
-    if (!("IntersectionObserver" in window)) return;
-    const sections = document.querySelectorAll("section.board-section");
-    const byId = {};
-    for (const a of el.sectionNav) byId[a.getAttribute("href").slice(1)] = a;
-    const observer = new IntersectionObserver((entries) => {
-      for (const entry of entries) {
-        if (!entry.isIntersecting) continue;
-        for (const a of el.sectionNav) a.removeAttribute("aria-current");
-        const a = byId[entry.target.id];
-        if (a) a.setAttribute("aria-current", "true");
-      }
-    }, { rootMargin: "-30% 0px -60% 0px" });
-    for (const s of sections) observer.observe(s);
+  let activeTab = "A";
+  function activateTab(bench, focus) {
+    activeTab = bench;
+    for (const key of BENCH_KEYS) {
+      const selected = key === bench;
+      el.tabs[key].setAttribute("aria-selected", String(selected));
+      el.tabs[key].tabIndex = selected ? 0 : -1;
+      ladders[key].section.hidden = !selected;
+    }
+    if (focus) el.tabs[bench].focus();
+    try { history.replaceState(null, "", "#benchmark-" + bench.toLowerCase()); } catch (_) { /* ignore */ }
+    renderPlot(bench);   // the panel was display:none, so its plot deferred
+  }
+  function initTabs() {
+    for (const key of BENCH_KEYS) {
+      el.tabs[key].addEventListener("click", () => activateTab(key, false));
+      el.tabs[key].addEventListener("keydown", (e) => {
+        if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+        e.preventDefault();
+        const other = BENCH_KEYS[(BENCH_KEYS.indexOf(key) + 1) % BENCH_KEYS.length];
+        activateTab(other, true);
+      });
+    }
+    const fromHash = (window.location.hash || "").replace("#benchmark-", "").toUpperCase();
+    activateTab(BENCH_KEYS.includes(fromHash) ? fromHash : "A", false);
   }
 
   // ---------------------------------------------------------------------------
@@ -1359,7 +1375,7 @@
   // ---------------------------------------------------------------------------
   initLadders();
   wireEvents();
-  initScrollSpy();
+  initTabs();
   renderMyStatus();
   refresh({ silent: false });
   scheduleRefresh();

@@ -51,12 +51,6 @@
       <div class="status-right my-status" id="my-status"></div>
     </section>
 
-    <nav class="section-nav" aria-label="Sections">
-      <a href="#overall" aria-current="true"><span class="seg-full">Overall standing</span><span class="seg-short" aria-hidden="true">Overall</span></a>
-      <a href="#benchmark-a"><span class="seg-full">Benchmark A</span><span class="seg-short" aria-hidden="true">A</span></a>
-      <a href="#benchmark-b"><span class="seg-full">Benchmark B</span><span class="seg-short" aria-hidden="true">B</span></a>
-    </nav>
-
     <section id="overall" class="board-section">
       <div class="section-head">
         <h2>Overall standing</h2>
@@ -93,8 +87,14 @@
       </div>
     </section>
 
-    <section id="benchmark-a" class="board-section" data-bench="A"></section>
-    <section id="benchmark-b" class="board-section" data-bench="B"></section>
+    <div class="bench-tabs" role="tablist" aria-label="Benchmarks">
+      <button type="button" role="tab" id="tab-a" aria-controls="benchmark-a" aria-selected="true">
+        Benchmark A <span class="tab-count" id="tab-count-a"></span></button>
+      <button type="button" role="tab" id="tab-b" aria-controls="benchmark-b" aria-selected="false" tabindex="-1">
+        Benchmark B <span class="tab-count" id="tab-count-b"></span></button>
+    </div>
+    <section id="benchmark-a" class="board-section bench-panel" data-bench="A" role="tabpanel" aria-labelledby="tab-a"></section>
+    <section id="benchmark-b" class="board-section bench-panel" data-bench="B" role="tabpanel" aria-labelledby="tab-b" hidden></section>
   </main>
 
   <footer class="site-footer">
