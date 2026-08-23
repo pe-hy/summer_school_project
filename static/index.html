@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Ostr-AI 2026 · Final Project Leaderboard</title>
-  <meta name="description" content="Leaderboard of final projects — Ostr-AI AI Summer School 2026">
+  <title>Ostr-AI 2026 · Leaderboard (provisional)</title>
+  <meta name="description" content="Leaderboard of the Efficient Intent Classification Challenge — Ostr-AI AI Summer School 2026">
   <link rel="icon" type="image/png" href="/static/favicon.png?v=__V__">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -22,97 +22,170 @@
         </div>
       </a>
       <nav class="header-actions" aria-label="Actions">
+        <a class="btn btn-ghost" href="/assignment">Assignment</a>
         <a class="btn btn-ghost" href="/guide">Submission guide</a>
-        <button class="btn btn-primary" id="btn-open-upload" type="button">Upload submission</button>
+        <button class="btn btn-primary" id="btn-open-upload" type="button">Upload results</button>
       </nav>
     </div>
   </header>
 
   <main class="container">
+    <section class="intro">
+      <p>Efficient Intent Classification Challenge — two benchmarks, ranked separately and then
+        averaged. Provisional: scored on a random 40&nbsp;% of each graded set; the final standing
+        uses the other 60&nbsp;% and is revealed at the end.</p>
+      <p><code>S = 100 × accuracy − log₂(latency in ms)</code> — halving your time per example is
+        worth exactly one accuracy point. <a href="/assignment">Read the assignment →</a></p>
+    </section>
+
     <section class="status-bar">
       <div class="status-left">
-        <span class="stat"><strong id="stat-count">–</strong> submissions</span>
+        <span class="stat"><strong id="stat-count">–</strong> participants</span>
+        <span class="stat-sep" aria-hidden="true">·</span>
+        <span class="stat">A <strong id="stat-a">–</strong></span>
+        <span class="stat-sep" aria-hidden="true">·</span>
+        <span class="stat">B <strong id="stat-b">–</strong></span>
         <span class="stat-sep" aria-hidden="true">·</span>
         <span class="stat">updated <strong id="stat-updated">–</strong></span>
       </div>
-      <div class="status-right my-status" id="my-status" aria-live="polite">
-        <!-- filled by app.js: "You have not submitted yet" or "Your submission: …" with Edit / Delete -->
-      </div>
+      <div class="status-right my-status" id="my-status" aria-live="polite"></div>
     </section>
 
-    <section class="table-card" aria-labelledby="table-caption">
-      <h2 id="table-caption" class="visually-hidden">Leaderboard</h2>
-      <div class="table-scroll" tabindex="0" role="region" aria-label="Leaderboard table (scrolls horizontally on small screens)">
-        <table class="leaderboard" id="leaderboard">
-          <thead>
-            <tr>
-              <th scope="col" class="col-check"><span class="visually-hidden">Show name on the plot</span></th>
-              <th scope="col" class="col-rank" data-key="rank" aria-sort="ascending">
-                <button type="button" class="sort-btn"><span>#</span><span class="sort-icon" aria-hidden="true"></span></button>
-              </th>
-              <th scope="col" data-key="name" aria-sort="none">
-                <button type="button" class="sort-btn"><span>Name</span><span class="sort-icon" aria-hidden="true"></span></button>
-              </th>
-              <th scope="col" class="num" data-key="metric" aria-sort="none">
-                <button type="button" class="sort-btn"><span id="metric-header">Metric</span><span class="sort-icon" aria-hidden="true"></span></button>
-              </th>
-              <th scope="col" class="num" data-key="avg_time_s" aria-sort="none">
-                <button type="button" class="sort-btn"><span>Avg time (s)</span><span class="sort-icon" aria-hidden="true"></span></button>
-              </th>
-              <th scope="col" class="col-date" data-key="submitted_at" aria-sort="none">
-                <button type="button" class="sort-btn"><span>Submitted</span><span class="sort-icon" aria-hidden="true"></span></button>
-              </th>
-            </tr>
-          </thead>
-          <tbody id="leaderboard-body">
-            <tr class="placeholder-row"><td colspan="6">Loading…</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p class="table-footnote" id="table-footnote"></p>
-    </section>
+    <nav class="section-nav" aria-label="Sections">
+      <a href="#overall" aria-current="true"><span class="seg-full">Overall standing</span><span class="seg-short" aria-hidden="true">Overall</span></a>
+      <a href="#benchmark-a"><span class="seg-full">Benchmark A</span><span class="seg-short" aria-hidden="true">A</span></a>
+      <a href="#benchmark-b"><span class="seg-full">Benchmark B</span><span class="seg-short" aria-hidden="true">B</span></a>
+    </nav>
 
-    <section class="plot-card" aria-labelledby="plot-title">
-      <div class="plot-head">
-        <div>
-          <h2 id="plot-title">Accuracy vs. speed</h2>
-          <p class="plot-sub">Every dot is one submission. Tick the boxes in the table to put names on the plot, or hover a dot. Top left is where you want to be.</p>
+    <section id="overall" class="board-section">
+      <div class="section-head">
+        <h2>Overall standing</h2>
+        <p class="section-sub"><code>S_final = (S_A + S_B) / 2</code> · a benchmark without a submission counts as 0</p>
+      </div>
+      <div class="table-card">
+        <div class="table-scroll" tabindex="0" role="region" aria-label="Overall standing table">
+          <table class="leaderboard leaderboard-overall" id="table-overall">
+            <thead>
+              <tr>
+                <th scope="col" class="col-rank" data-key="rank" aria-sort="ascending">
+                  <button type="button" class="sort-btn"><span>#</span><span class="sort-icon" aria-hidden="true"></span></button>
+                </th>
+                <th scope="col" data-key="name" aria-sort="none">
+                  <button type="button" class="sort-btn"><span>Name</span><span class="sort-icon" aria-hidden="true"></span></button>
+                </th>
+                <th scope="col" class="num" data-key="sA" aria-sort="none">
+                  <button type="button" class="sort-btn"><span>S — A</span><span class="sort-icon" aria-hidden="true"></span></button>
+                </th>
+                <th scope="col" class="num" data-key="sB" aria-sort="none">
+                  <button type="button" class="sort-btn"><span>S — B</span><span class="sort-icon" aria-hidden="true"></span></button>
+                </th>
+                <th scope="col" class="num" data-key="sFinal" aria-sort="none">
+                  <button type="button" class="sort-btn"><span>S final</span><span class="sort-icon" aria-hidden="true"></span></button>
+                </th>
+              </tr>
+            </thead>
+            <tbody id="table-overall-body">
+              <tr class="placeholder-row"><td colspan="5">Loading…</td></tr>
+            </tbody>
+          </table>
         </div>
-        <button type="button" class="btn btn-ghost btn-sm" id="btn-label-all" disabled>Show all names</button>
+        <p class="table-footnote">The final standing of the assignment: the mean of both ladder scores. A missing benchmark contributes 0.</p>
       </div>
-      <figure class="plot-figure">
-        <div id="plot" class="plot-host"></div>
-        <p id="plot-empty" class="plot-placeholder">The plot appears with the first submission.</p>
-        <div id="plot-tooltip" class="plot-tooltip" hidden></div>
-      </figure>
     </section>
+
+    <section id="benchmark-a" class="board-section" data-bench="A"></section>
+    <section id="benchmark-b" class="board-section" data-bench="B"></section>
   </main>
 
   <footer class="site-footer">
     <div class="container">
       <span>Ostr-AI · AI Summer School 2026, Ostrava</span>
       <span class="footer-sep" aria-hidden="true">·</span>
+      <a href="/assignment">Assignment</a>
+      <span class="footer-sep" aria-hidden="true">·</span>
+      <a href="/guide">Submission guide</a>
+      <span class="footer-sep" aria-hidden="true">·</span>
       <a href="/examples/submission.csv">submission.csv</a>
       <span class="footer-sep" aria-hidden="true">·</span>
       <a href="/examples/submission.json">submission.json</a>
-      <span class="footer-sep" aria-hidden="true">·</span>
-      <a href="/guide">Submission guide</a>
     </div>
   </footer>
+
+  <!-- Ladder section template, cloned per benchmark by app.js -->
+  <template id="ladder-template">
+    <div class="section-head">
+      <h2 class="ladder-title"></h2>
+      <p class="section-sub ladder-sub"></p>
+    </div>
+    <div class="table-card">
+      <div class="card-head">
+        <span class="card-head-note ladder-count"></span>
+        <button type="button" class="btn btn-ghost btn-sm ladder-upload"></button>
+      </div>
+      <div class="table-scroll" tabindex="0" role="region">
+        <table class="leaderboard leaderboard-ladder">
+          <thead>
+            <tr>
+              <th scope="col" class="col-check"><span class="visually-hidden">Show this person's name on the plots</span></th>
+              <th scope="col" class="col-rank" data-key="rank" aria-sort="ascending">
+                <button type="button" class="sort-btn"><span>#</span><span class="sort-icon" aria-hidden="true"></span></button>
+              </th>
+              <th scope="col" data-key="name" aria-sort="none">
+                <button type="button" class="sort-btn"><span>Name</span><span class="sort-icon" aria-hidden="true"></span></button>
+              </th>
+              <th scope="col" class="num" data-key="s" aria-sort="none">
+                <button type="button" class="sort-btn"><span>Score S</span><span class="sort-icon" aria-hidden="true"></span></button>
+              </th>
+              <th scope="col" class="num" data-key="metric" aria-sort="none">
+                <button type="button" class="sort-btn"><span>Accuracy</span><span class="sort-icon" aria-hidden="true"></span></button>
+              </th>
+              <th scope="col" class="num" data-key="latency_ms" aria-sort="none">
+                <button type="button" class="sort-btn"><span>Latency (ms/ex)</span><span class="sort-icon" aria-hidden="true"></span></button>
+              </th>
+              <th scope="col" class="col-date" data-key="submitted_at" aria-sort="none">
+                <button type="button" class="sort-btn"><span>Submitted</span><span class="sort-icon" aria-hidden="true"></span></button>
+              </th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="table-footnote">Ranked by <code>S = 100 × accuracy − log₂(latency in ms)</code>.
+        Halving your time per example is worth exactly one accuracy point. Equal scores share a rank.
+        † latency below 0.01 ms/example is clipped to 0.01 when scoring. Click a column header to sort.</p>
+    </div>
+    <div class="plot-card">
+      <div class="plot-head">
+        <div>
+          <h3 class="plot-title">Accuracy vs. latency</h3>
+          <p class="plot-sub">Every dot is one result — dashed lines are equal-score lines.
+            Tick the boxes in the table to put names on the plots, or hover a dot.</p>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm btn-label-all" disabled>Show all names</button>
+      </div>
+      <figure class="plot-figure">
+        <div class="plot-host"></div>
+        <p class="plot-placeholder"></p>
+        <div class="plot-tooltip" hidden></div>
+      </figure>
+    </div>
+  </template>
 
   <!-- Upload / edit dialog -->
   <dialog id="upload-dialog" class="dialog" aria-labelledby="upload-title">
     <form method="dialog" class="dialog-form" id="upload-form">
       <header class="dialog-header">
-        <h2 id="upload-title">Upload submission</h2>
+        <h2 id="upload-title">Upload results</h2>
         <button type="button" class="icon-btn" id="btn-close-upload" aria-label="Close">&times;</button>
       </header>
 
       <p class="dialog-hint">
-        Upload a <code>.csv</code> or <code>.json</code> file with exactly one row:
-        <code>name, metric, avg_time_s</code>.
+        A <code>.csv</code> or <code>.json</code> file with one row per benchmark — both at once,
+        or one at a time. Columns: <code>name, benchmark, metric, latency_ms</code>
+        (accuracy 0–1; latency in <strong>milliseconds per example</strong>).
         Templates: <a href="/examples/submission.csv">CSV</a> · <a href="/examples/submission.json">JSON</a>
-        · <a href="/guide" target="_blank" rel="noopener">guide</a>.
+        · <a href="/guide" target="_blank" rel="noopener">guide</a>
+        · <a href="/assignment" target="_blank" rel="noopener">assignment</a>.
       </p>
 
       <label class="dropzone" id="dropzone" for="file-input">
@@ -124,9 +197,17 @@
 
       <div id="validation-box" class="validation" role="alert" hidden></div>
 
+      <fieldset id="bench-chooser" class="bench-chooser" hidden>
+        <legend>This file does not say which benchmark it is:</legend>
+        <label><input type="radio" name="bench-choice" value="A"> Benchmark A</label>
+        <label><input type="radio" name="bench-choice" value="B"> Benchmark B</label>
+      </fieldset>
+
+      <div id="warn-box" class="validation warn" hidden></div>
+
       <div id="preview-box" class="preview" hidden>
-        <h3>Parsed submission</h3>
-        <dl class="preview-grid" id="preview-grid"></dl>
+        <h3>Parsed results</h3>
+        <div id="preview-entries"></div>
       </div>
 
       <footer class="dialog-footer">
@@ -143,9 +224,9 @@
   <dialog id="delete-dialog" class="dialog dialog-small" aria-labelledby="delete-title">
     <form method="dialog" class="dialog-form">
       <header class="dialog-header">
-        <h2 id="delete-title">Delete your submission?</h2>
+        <h2 id="delete-title">Delete?</h2>
       </header>
-      <p class="dialog-hint">This removes your row from the leaderboard. You can upload a new file at any time.</p>
+      <p class="dialog-hint" id="delete-hint">This removes the result from the ladder. You can upload a new file at any time.</p>
       <footer class="dialog-footer">
         <span></span>
         <div class="dialog-buttons">

@@ -1,10 +1,10 @@
 /* Ostr-AI 2026 leaderboard — front-end logic (no dependencies).
  *
- * - Fetches rows from /api/submissions and renders a sortable table.
- * - Parses & validates a .csv / .json submission entirely in the browser,
- *   then PUTs it to /api/submissions/mine.
- * - Identity = random owner token in localStorage. The server marks rows that
- *   belong to this token with `mine: true`, so the owner can re-upload or delete.
+ * Two benchmark ladders (A, B) + an overall standing, per the Efficient Intent
+ * Classification Challenge. Rows come from /api/submissions; a row's ladder
+ * score S = 100*accuracy - log2(latency_ms) is computed by the server.
+ * Identity = random owner token in localStorage; the server marks rows owned by
+ * this browser with `mine: true` (one row per benchmark).
  */
 (() => {
   "use strict";
@@ -13,22 +13,23 @@
   // Configuration
   // ---------------------------------------------------------------------------
   const CONFIG = {
-    METRIC_LABEL: "Accuracy",        // shown in the column header and status line
-    METRIC_HIGHER_IS_BETTER: true,   // rank #1 = highest metric (set false for loss/error metrics)
-    REFRESH_MS: 10000,               // background refresh interval
+    REFRESH_MS: 10000,
     MAX_NAME_LEN: 80,
     MAX_ABS_NUMBER: 1e15,
     MAX_FILE_BYTES: 64 * 1024,
+    LAMBDA: 1.0,          // keep in sync with app.py
+    L_REF_MS: 1.0,
+    LATENCY_FLOOR_MS: 0.01,
   };
+  const BENCHMARKS = [
+    { key: "A", label: "Benchmark A", sub: "77 intents · one service domain", dotClass: "" },
+    { key: "B", label: "Benchmark B", sub: "150 intents · ten service domains", dotClass: "bench-b" },
+  ];
+  const BENCH_KEYS = BENCHMARKS.map((b) => b.key);
 
-  // Keep in sync with app.py (validate_entry) and submit_readme.md
-  const FIELDS = ["name", "metric", "avg_time_s"];
+  const FIELDS = ["name", "benchmark", "metric", "latency_ms"];
   const STRING_FIELDS = ["name"];
-  const NUMBER_FIELDS = ["metric", "avg_time_s"];
-  const NON_NEGATIVE_FIELDS = ["avg_time_s"];
-  const FIELD_LABELS = {
-    name: "Name", metric: CONFIG.METRIC_LABEL, avg_time_s: "Avg time (s)",
-  };
+  const NUMBER_FIELDS = ["metric", "latency_ms"];
 
   const TOKEN_KEY = "ostrai_owner_token";
 
@@ -37,15 +38,15 @@
   // ---------------------------------------------------------------------------
   const $ = (sel) => document.querySelector(sel);
   const el = {
-    tbody: $("#leaderboard-body"),
-    headers: Array.from(document.querySelectorAll("#leaderboard thead th[data-key]")),
     statCount: $("#stat-count"),
+    statA: $("#stat-a"),
+    statB: $("#stat-b"),
     statUpdated: $("#stat-updated"),
     myStatus: $("#my-status"),
-    footnote: $("#table-footnote"),
-    metricHeader: $("#metric-header"),
+    sectionNav: document.querySelectorAll(".section-nav a"),
+    overallTable: $("#table-overall"),
+    overallBody: $("#table-overall-body"),
     btnOpenUpload: $("#btn-open-upload"),
-    btnLabelAll: $("#btn-label-all"),
     uploadDialog: $("#upload-dialog"),
     uploadTitle: $("#upload-title"),
     btnCloseUpload: $("#btn-close-upload"),
@@ -55,10 +56,14 @@
     dropzone: $("#dropzone"),
     dropzoneFile: $("#dropzone-file"),
     validationBox: $("#validation-box"),
+    warnBox: $("#warn-box"),
+    benchChooser: $("#bench-chooser"),
     previewBox: $("#preview-box"),
-    previewGrid: $("#preview-grid"),
+    previewEntries: $("#preview-entries"),
     dialogNote: $("#dialog-note"),
     deleteDialog: $("#delete-dialog"),
+    deleteTitle: $("#delete-title"),
+    deleteHint: $("#delete-hint"),
     btnCancelDelete: $("#btn-cancel-delete"),
     btnConfirmDelete: $("#btn-confirm-delete"),
     toast: $("#toast"),
@@ -68,20 +73,27 @@
   // State
   // ---------------------------------------------------------------------------
   const state = {
-    rows: [],                 // rows from the server, in rank order
-    mine: null,               // this browser's row, if any
-    sortKey: "rank",
-    sortDir: "asc",
-    pending: null,            // validated entry waiting to be submitted
-    refreshTimer: null,
-    labeled: new Set(),       // row ids whose names are drawn on the plot (checkboxes)
-    refreshSeq: 0,            // ignore responses of older in-flight refreshes
-    fileSeq: 0,               // ignore results of superseded file reads
-    submitting: false,        // the upload dialog cannot be dismissed while a PUT is in flight
-    statusShape: null,        // "mine|storageOk" shape of #my-status, to update text in place
-    statusNodes: null,
-    lastTableKey: null,       // skip tbody rebuilds when nothing changed (keeps checkbox focus)
+    rows: [],                       // all rows from the server
+    ladders: { A: [], B: [] },      // ranked rows per benchmark
+    overall: [],                    // ranked overall standings
+    mine: { A: null, B: null },     // this browser's row per benchmark
+    labeled: new Set(),             // person_keys whose names show on BOTH plots
+    seededSelf: false,
+    refreshSeq: 0,
+    fileSeq: 0,
+    submitting: false,
+    pending: null,                  // validated entries waiting for submit
+    pendingFile: null,              // {name, text} for bench-chooser re-runs
+    uploadScope: null,              // null | "A" | "B"
+    deleteBench: null,
+    statusKey: null,
+    views: {},                      // per-table sort state + caches, filled below
   };
+  for (const key of ["overall", "A", "B"]) {
+    state.views[key] = { sortKey: "rank", sortDir: "asc", lastTableKey: null };
+  }
+  const ladders = {};               // per-benchmark DOM refs, filled by initLadders()
+  const plots = {};                 // per-benchmark plot state {host, empty, tip, index, lastKey}
 
   // ---------------------------------------------------------------------------
   // Identity (owner token in localStorage)
@@ -93,7 +105,7 @@
     return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
   }
   const TOKEN_OK = (t) => typeof t === "string" && /^[A-Za-z0-9-]{16,64}$/.test(t);
-  let storageOk = true;      // false when the browser blocks localStorage (private mode, locked-down lab PCs)
+  let storageOk = true;
   function getOwnerToken() {
     let token = null;
     try { token = localStorage.getItem(TOKEN_KEY); } catch (_) { storageOk = false; }
@@ -142,19 +154,35 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Parsing: CSV / JSON  ->  plain object with the 5 canonical keys
+  // Parsing: CSV / JSON  ->  1-2 entries with the canonical keys
   // ---------------------------------------------------------------------------
-  // "Avg time (s)", "avg_time_s", "AVG-TIME-S" all normalize to "avgtimes"
   const stripBOM = (s) => s.replace(/^\uFEFF/, "");
   const normalizeHeader = (h) => stripBOM(String(h)).toLowerCase().replace(/[^a-z0-9]/g, "");
   const CANONICAL_BY_NORMALIZED = {
     ...Object.fromEntries(FIELDS.map((f) => [normalizeHeader(f), f])),
-    accuracy: "metric",                       // "Accuracy" column header
-    avgtimeexamples: "avg_time_s",            // "Avg time / example (s)"
-    avgtimeperexamples: "avg_time_s",
-    averagetimeperexamples: "avg_time_s",
-    averagetimeperexample: "avg_time_s",
+    accuracy: "metric",
+    acc: "metric",
+    latency: "latency_ms",
+    latencyms: "latency_ms",
+    latencymsexample: "latency_ms",
+    latencymsex: "latency_ms",
+    bench: "benchmark",
+    project: "benchmark",
   };
+  // Headers from the OLD schema get a pointed error instead of silent misreads.
+  const SECONDS_TRAP = new Set(["avgtimes", "avgtimeexamples", "avgtimeperexamples",
+    "averagetimeperexamples", "averagetimeperexample", "seconds", "timeperexample", "avgtimeexample"]);
+  const SECONDS_TRAP_MSG = "Latency is now milliseconds per example: multiply your seconds by 1000 and name the column 'latency_ms'.";
+
+  function normalizeBenchmark(v) {   // mirrors app.py normalize_benchmark
+    if (typeof v !== "string") return null;
+    const key = v.toLowerCase().replace(/[^a-z0-9]/g, "");
+    for (const b of BENCH_KEYS) {
+      const low = b.toLowerCase();
+      if ([low, `benchmark${low}`, `bench${low}`, `project${low}`].includes(key)) return b;
+    }
+    return null;
+  }
 
   function detectDelimiter(headerLine) {
     let best = ",", bestCount = -1;
@@ -165,7 +193,7 @@
     return best;
   }
 
-  // Minimal RFC-4180 CSV parser (quotes, escaped quotes, CRLF). Returns array of rows (arrays).
+  // Minimal RFC-4180 CSV parser (quotes, escaped quotes, CRLF).
   function parseCSV(text, delimiter) {
     const rows = [];
     let row = [], field = "", inQuotes = false;
@@ -174,97 +202,102 @@
       if (inQuotes) {
         if (c === '"') {
           if (text[i + 1] === '"') { field += '"'; i++; } else { inQuotes = false; }
-        } else {
-          field += c;
-        }
-      } else if (c === '"') {
-        inQuotes = true;
-      } else if (c === delimiter) {
-        row.push(field); field = "";
-      } else if (c === "\n" || c === "\r") {
+        } else field += c;
+      } else if (c === '"') inQuotes = true;
+      else if (c === delimiter) { row.push(field); field = ""; }
+      else if (c === "\n" || c === "\r") {
         if (c === "\r" && text[i + 1] === "\n") i++;
         row.push(field); field = "";
         rows.push(row); row = [];
-      } else {
-        field += c;
-      }
+      } else field += c;
     }
     if (field !== "" || row.length > 0) { row.push(field); rows.push(row); }
-    // drop completely empty lines
     return rows.filter((r) => r.some((v) => v.trim() !== ""));
   }
 
-  function objectFromCSV(text) {
-    text = stripBOM(text);
-    const headerLine = text.split(/\r?\n/).find((l) => l.trim() !== "") || "";
-    const delimiter = detectDelimiter(headerLine);
-    const rows = parseCSV(text, delimiter);
-    if (rows.length === 0) return { errors: ["The file is empty."] };
-    if (rows.length < 2) return { errors: ["Missing data row: the file needs a header line and exactly one data line."] };
-
-    const errors = [];
-    if (rows.length > 2) errors.push(`Expected exactly one data row, found ${rows.length - 1}.`);
-    const header = rows[0].map((h) => h.trim());
-    const values = rows[1].map((v) => v.trim());
-    if (values.length !== header.length) {
-      errors.push(`The data row has ${values.length} value(s) but the header has ${header.length} column(s). Check the delimiter and quoting.`);
-      return { errors };
-    }
-
-    const obj = {};
-    const unknown = [];
-    const seen = new Set();
-    header.forEach((h, i) => {
-      const key = CANONICAL_BY_NORMALIZED[normalizeHeader(h)];
-      if (!key) { unknown.push(h || `(empty column ${i + 1})`); return; }
-      if (seen.has(key)) { errors.push(`Duplicate column '${h}'.`); return; }
-      seen.add(key);
-      obj[key] = NUMBER_FIELDS.includes(key) ? parseNumberString(values[i]) : values[i];
-    });
-    if (unknown.length) errors.push("Unexpected column(s): " + unknown.map((u) => `'${u}'`).join(", "));
-    return { obj, errors };
-  }
-
-  // Numbers must use a dot as decimal separator, no thousands separators.
-  // Returns a finite number, or the original string so validation can explain the problem.
   function parseNumberString(raw) {
     const s = String(raw).trim();
     if (!/^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/.test(s)) return s;
     return Number(s);
   }
 
-  function objectFromJSON(text) {
+  function entriesFromCSV(text) {
+    text = stripBOM(text);
+    const headerLine = text.split(/\r?\n/).find((l) => l.trim() !== "") || "";
+    const delimiter = detectDelimiter(headerLine);
+    const rows = parseCSV(text, delimiter);
+    if (rows.length === 0) return { errors: ["The file is empty."] };
+    if (rows.length < 2) return { errors: ["Missing data rows: the file needs a header line and one or two data lines."] };
+    if (rows.length > 3) return { errors: [`A file holds one result per benchmark — at most two data rows, found ${rows.length - 1}.`] };
+
+    const errors = [];
+    const header = rows[0].map((h) => h.trim());
+    const keys = header.map((h) => {
+      const norm = normalizeHeader(h);
+      if (SECONDS_TRAP.has(norm)) { errors.push(SECONDS_TRAP_MSG); return null; }
+      return CANONICAL_BY_NORMALIZED[norm] || null;
+    });
+    const unknown = header.filter((h, i) => keys[i] === null && !SECONDS_TRAP.has(normalizeHeader(h)));
+    if (unknown.length) errors.push("Unexpected column(s): " + unknown.map((u) => `'${u || "(empty)"}'`).join(", "));
+    const seen = new Set();
+    for (const k of keys) {
+      if (k && seen.has(k)) errors.push(`Duplicate column '${k}'.`);
+      if (k) seen.add(k);
+    }
+    if (errors.length) return { errors };
+
+    const entries = [];
+    for (let r = 1; r < rows.length; r++) {
+      const values = rows[r].map((v) => v.trim());
+      if (values.length !== header.length) {
+        errors.push(`Data row ${r} has ${values.length} value(s) but the header has ${header.length} column(s). Check the delimiter and quoting.`);
+        continue;
+      }
+      const obj = {};
+      keys.forEach((k, i) => {
+        if (!k) return;
+        obj[k] = NUMBER_FIELDS.includes(k) ? parseNumberString(values[i]) : values[i];
+      });
+      entries.push(obj);
+    }
+    return errors.length ? { errors } : { entries, errors: [] };
+  }
+
+  function entriesFromJSON(text) {
     let data;
     try { data = JSON.parse(stripBOM(text)); }
     catch (e) { return { errors: [`Invalid JSON: ${e.message}`] }; }
-    if (Array.isArray(data)) {
-      if (data.length !== 1) return { errors: [`Expected a single object (or an array with exactly one object), found an array of ${data.length}.`] };
-      data = data[0];
-    }
-    if (data === null || typeof data !== "object" || Array.isArray(data)) {
-      return { errors: ["The JSON must be an object with the keys name, metric, avg_time_s."] };
-    }
+    if (!Array.isArray(data)) data = [data];
+    if (data.length === 0) return { errors: ["The file is empty."] };
+    if (data.length > 2) return { errors: [`A file holds one result per benchmark — at most two objects, found ${data.length}.`] };
     const errors = [];
-    const obj = {};
-    const unknown = [];
-    const seen = new Set();
-    for (const [k, v] of Object.entries(data)) {
-      const key = CANONICAL_BY_NORMALIZED[normalizeHeader(k)];
-      if (!key) { unknown.push(k); continue; }
-      if (seen.has(key)) { errors.push(`Duplicate key '${k}'.`); continue; }
-      seen.add(key);
-      // numeric strings ("0.93") are accepted for number fields as a convenience; everything else as-is
-      obj[key] = (NUMBER_FIELDS.includes(key) && typeof v === "string") ? parseNumberString(v) : v;
+    const entries = [];
+    for (const item of data) {
+      if (item === null || typeof item !== "object" || Array.isArray(item)) {
+        errors.push("Each result must be an object with the keys name, benchmark, metric, latency_ms.");
+        continue;
+      }
+      const obj = {};
+      const unknown = [];
+      for (const [k, v] of Object.entries(item)) {
+        const norm = normalizeHeader(k);
+        if (SECONDS_TRAP.has(norm)) { errors.push(SECONDS_TRAP_MSG); continue; }
+        const key = CANONICAL_BY_NORMALIZED[norm];
+        if (!key) { unknown.push(k); continue; }
+        obj[key] = (NUMBER_FIELDS.includes(key) && typeof v === "string") ? parseNumberString(v) : v;
+      }
+      if (unknown.length) errors.push("Unexpected key(s): " + unknown.map((u) => `'${u}'`).join(", "));
+      entries.push(obj);
     }
-    if (unknown.length) errors.push("Unexpected key(s): " + unknown.map((u) => `'${u}'`).join(", "));
-    return { obj, errors };
+    return errors.length ? { errors } : { entries, errors: [] };
   }
 
   // ---------------------------------------------------------------------------
-  // Validation (mirrors app.py:validate_entry)
+  // Validation (keep in sync with app.py validate_entry / validate_submission)
   // ---------------------------------------------------------------------------
   const describe = (v) => {
     if (v === null) return "null";
+    if (v === undefined) return "missing";
     if (Array.isArray(v)) return "a list";
     if (typeof v === "object") return "an object";
     if (typeof v === "string") return `'${v.length > 40 ? v.slice(0, 40) + "…" : v}'`;
@@ -274,241 +307,141 @@
   function validateEntry(obj) {
     const errors = [];
     const clean = {};
-    for (const f of STRING_FIELDS) {
-      const v = obj[f];
-      if (v === undefined) { errors.push(`Missing column '${f}'.`); continue; }
-      if (typeof v !== "string") { errors.push(`'${f}' must be text, got ${describe(v)}.`); continue; }
-      const s = v.trim().replace(/\s+/g, " ");
-      if (!s) { errors.push(`'${f}' must not be empty.`); continue; }
-      if (s.length > CONFIG.MAX_NAME_LEN) { errors.push(`'${f}' must be at most ${CONFIG.MAX_NAME_LEN} characters.`); continue; }
-      if (/[\p{Cc}\p{Cf}\p{Cs}\p{Co}\p{Cn}]/u.test(s)) { errors.push(`'${f}' contains invisible or control characters.`); continue; }
-      clean[f] = s;
+    const nv = obj.name;
+    if (nv === undefined) errors.push("Missing column 'name'.");
+    else if (typeof nv !== "string") errors.push(`'name' must be text, got ${describe(nv)}.`);
+    else {
+      const s = nv.trim().replace(/\s+/g, " ");
+      if (!s) errors.push("'name' must not be empty.");
+      else if (s.length > CONFIG.MAX_NAME_LEN) errors.push(`'name' must be at most ${CONFIG.MAX_NAME_LEN} characters.`);
+      else if (/[\p{Cc}\p{Cf}\p{Cs}\p{Co}\p{Cn}]/u.test(s)) errors.push("'name' contains invisible or control characters.");
+      else clean.name = s;
+    }
+    if (obj.benchmark === undefined) errors.push("Missing column 'benchmark'.");
+    else {
+      const b = normalizeBenchmark(obj.benchmark);
+      if (b === null) errors.push(`'benchmark' must be "A" or "B", got ${describe(obj.benchmark)}.`);
+      else clean.benchmark = b;
     }
     for (const f of NUMBER_FIELDS) {
       const v = obj[f];
       if (v === undefined) { errors.push(`Missing column '${f}'.`); continue; }
       if (typeof v !== "number" || !Number.isFinite(v) || Math.abs(v) > CONFIG.MAX_ABS_NUMBER) {
         const hint = typeof v === "string" && /\d,\d/.test(v) ? " (use a dot as decimal separator, no thousands separators)" : "";
-        errors.push(`'${f}' must be a number such as 0.93, got ${describe(v)}${hint}.`);
+        errors.push(`'${f}' must be a number such as ${f === "metric" ? "0.93" : "2.31"}, got ${describe(v)}${hint}.`);
         continue;
       }
-      if (NON_NEGATIVE_FIELDS.includes(f) && v < 0) { errors.push(`'${f}' must be >= 0.`); continue; }
+      if (f === "latency_ms" && v < 0) { errors.push("'latency_ms' must be >= 0."); continue; }
       if (f === "metric" && (v < 0 || v > 1)) { errors.push("'metric' must be between 0 and 1 — accuracy as a fraction (93.12 % is 0.9312)."); continue; }
       clean[f] = v;
     }
     return { clean: errors.length ? null : clean, errors };
   }
 
-  function parseSubmissionFile(name, text) {
+  // Full-file validation. injectBench fills a missing benchmark (bench-chooser /
+  // scoped upload); needsBenchChoice is set when exactly one row lacks it.
+  function parseSubmissionFile(name, text, injectBench) {
     const lower = name.toLowerCase();
     let parsed;
-    if (lower.endsWith(".json")) parsed = objectFromJSON(text);
-    else if (lower.endsWith(".csv")) parsed = objectFromCSV(text);
+    if (lower.endsWith(".json")) parsed = entriesFromJSON(text);
+    else if (lower.endsWith(".csv")) parsed = entriesFromCSV(text);
     else return { clean: null, errors: ["Unsupported file type: please upload a .csv or .json file."] };
+    if (!parsed.entries) return { clean: null, errors: parsed.errors };
 
-    const errors = [...parsed.errors];
-    if (!parsed.obj) return { clean: null, errors };
-    const v = validateEntry(parsed.obj);
-    errors.push(...v.errors);
-    return { clean: errors.length ? null : v.clean, errors };
+    const raws = parsed.entries;
+    if (injectBench && raws.length === 1 && raws[0].benchmark === undefined) {
+      raws[0] = { ...raws[0], benchmark: injectBench };
+    }
+    const needsBenchChoice = raws.length === 1 && raws[0].benchmark === undefined;
+
+    const errors = [];
+    const clean = [];
+    for (let i = 0; i < raws.length; i++) {
+      const v = validateEntry(raws[i]);
+      const rowBench = normalizeBenchmark(raws[i].benchmark);
+      const prefix = raws.length > 1
+        ? `Row ${i + 1}${rowBench ? ` (Benchmark ${rowBench})` : ""}: `
+        : "";
+      errors.push(...v.errors.map((e) => prefix + e));
+      if (v.clean) clean.push(v.clean);
+    }
+    if (!errors.length) {
+      const benches = clean.map((e) => e.benchmark);
+      if (new Set(benches).size !== benches.length) {
+        errors.push("Both results are for the same benchmark — one must be A and one B.");
+      }
+      const names = [...new Set(clean.map((e) => e.name))];
+      if (names.length > 1) {
+        errors.push(`Both results must carry the same name — '${names[0]}' and '${names[1]}'.`);
+      }
+    }
+    return { clean: errors.length ? null : clean, errors, needsBenchChoice };
   }
 
   // ---------------------------------------------------------------------------
-  // Formatting
+  // Scoring & standings
   // ---------------------------------------------------------------------------
-  const fmtNumber = (x, maxFrac) => {
-    const n = Number(x);
-    if (n !== 0 && Math.abs(n) < 10 ** -maxFrac) return n.toExponential(2);   // 0.0004 -> "4.00e-4", never "0"
-    return n.toLocaleString("en-US", { maximumFractionDigits: maxFrac, useGrouping: false });
-  };
-  const fmtMetric = (x) => fmtNumber(x, 6);
-  const fmtTime = (x) => {
-    const n = Number(x);
-    if (!Number.isFinite(n)) return "–";
+  // Keep in sync with app.py score(); used for the pre-submit preview only —
+  // ladder rows carry the server-computed `s`.
+  const scoreOf = (e) => 100 * e.metric -
+    CONFIG.LAMBDA * Math.log2(Math.max(e.latency_ms, CONFIG.LATENCY_FLOOR_MS) / CONFIG.L_REF_MS);
+
+  const fmtScore = (s) => (s === null || s === undefined) ? "—" : s.toFixed(2);
+  const fmtPct = (x) => (x * 100).toFixed(2) + " %";
+  const fmtLatency = (ms) => {
+    const n = Number(ms);
+    if (!Number.isFinite(n)) return "—";
     if (n === 0) return "0";
-    if (Math.abs(n) >= 1) return fmtNumber(n, 3);
-    if (Math.abs(n) < 1e-4) return n.toExponential(2);
-    return String(+n.toPrecision(3));   // 0.0021 vs 0.0024 stay distinguishable
+    return String(+n.toPrecision(3));
   };
   function fmtDate(iso) {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return "–";
-    return d.toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    return d.toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   }
   const fmtClock = (d) => d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
-  // ---------------------------------------------------------------------------
-  // Ranking & sorting
-  // ---------------------------------------------------------------------------
-  // Returns rows sorted by rank (best first) with a `rank` property.
-  // Competition ranking: equal metric -> equal rank (1, 2, 2, 4).
+  // Ranked ladder rows: S desc, then accuracy desc, latency asc, earlier first.
+  // Competition ranking with ties on S rounded to the displayed 2 dp.
   function computeRanks(rows) {
-    const dir = CONFIG.METRIC_HIGHER_IS_BETTER ? -1 : 1;
     const sorted = [...rows].sort((a, b) =>
-      dir * (a.metric - b.metric) ||                    // better metric first
-      (a.avg_time_s - b.avg_time_s) ||                  // tie-break: faster inference
-      String(a.submitted_at).localeCompare(String(b.submitted_at)));  // then earlier submission
-    let lastRank = 0;
+      (b.s - a.s) || (b.metric - a.metric) || (a.latency_ms - b.latency_ms) ||
+      String(a.submitted_at).localeCompare(String(b.submitted_at)));
+    let lastRank = 0, lastS = null;
     return sorted.map((r, i) => {
-      const prev = sorted[i - 1];
-      const rank = prev && prev.metric === r.metric ? lastRank : i + 1;
-      lastRank = rank;
+      const sKey = r.s.toFixed(2);
+      const rank = sKey === lastS ? lastRank : i + 1;
+      lastRank = rank; lastS = sKey;
       return { ...r, rank };
     });
   }
 
-  function sortRows(rows) {
-    const { sortKey, sortDir } = state;
-    if (sortKey === "rank" && sortDir === "asc") return rows;   // already in rank order (with tie-breaks)
-    const sign = sortDir === "asc" ? 1 : -1;
-    const collator = new Intl.Collator(undefined, { sensitivity: "base", numeric: true });
-    return rows.map((r, i) => [r, i]).sort(([a, ia], [b, ib]) => {
-      let c;
-      if (typeof a[sortKey] === "number") c = a[sortKey] - b[sortKey];
-      else c = collator.compare(String(a[sortKey]), String(b[sortKey]));
-      if (c === 0) c = sign * (ia - ib);   // keep rank order among equals, whichever direction
-      return sign * c;
-    }).map(([r]) => r);
-  }
-
-  // ---------------------------------------------------------------------------
-  // Rendering
-  // ---------------------------------------------------------------------------
-  function td(className, text) {
-    const cell = document.createElement("td");
-    if (className) cell.className = className;
-    cell.textContent = text;
-    return cell;
-  }
-
-  function renderTable() {
-    const rows = sortRows(state.rows);
-    const key = `${state.sortKey}|${state.sortDir}|` +
-      rows.map((r) => `${r.id},${r.name},${r.metric},${r.avg_time_s},${r.rank},${r.mine ? 1 : 0},${r.submitted_at}`).join(";");
-    if (key === state.lastTableKey) return;
-    state.lastTableKey = key;
-    const frag = document.createDocumentFragment();
-    if (rows.length === 0) {
-      const tr = document.createElement("tr");
-      tr.className = "placeholder-row";
-      const cell = td(null, "No submissions yet — be the first to upload one.");
-      cell.colSpan = el.headers.length + 1;
-      tr.appendChild(cell);
-      frag.appendChild(tr);
-    }
+  // Overall standing: group by person_key; a missing benchmark contributes 0.
+  function overallStandings(rows) {
+    const people = new Map();
     for (const r of rows) {
-      const tr = document.createElement("tr");
-      tr.dataset.id = r.id;
-      if (r.mine) tr.classList.add("mine");
-      const checkCell = document.createElement("td");
-      checkCell.className = "check";
-      const check = document.createElement("input");
-      check.type = "checkbox";
-      check.className = "name-check";
-      check.checked = state.labeled.has(r.id);
-      check.setAttribute("aria-label", `Show ${r.name} on the plot`);
-      check.addEventListener("change", () => setLabeled(r.id, check.checked));
-      checkCell.appendChild(check);
-      tr.appendChild(checkCell);
-      const rankCell = document.createElement("td");
-      rankCell.className = "rank";
-      const medal = document.createElement("span");
-      medal.className = "medal" + (r.rank <= 3 ? ` m${r.rank}` : "");
-      medal.textContent = r.rank;
-      rankCell.appendChild(medal);
-      tr.appendChild(rankCell);
-
-      const nameCell = td("name-cell", r.name);
-      if (r.mine) {
-        const badge = document.createElement("span");
-        badge.className = "badge";
-        badge.textContent = "you";
-        nameCell.appendChild(badge);
-      }
-      tr.appendChild(nameCell);
-      tr.appendChild(td("num", fmtMetric(r.metric)));
-      tr.appendChild(td("num", fmtTime(r.avg_time_s)));
-      const dateCell = td("date", fmtDate(r.submitted_at));
-      dateCell.title = r.submitted_at;
-      tr.appendChild(dateCell);
-      frag.appendChild(tr);
+      const p = people.get(r.person_key) || { pk: r.person_key, name: r.name, mine: false, sA: null, sB: null };
+      p["s" + r.benchmark] = r.s;
+      p.name = r.name;
+      p.mine = p.mine || r.mine;
+      people.set(r.person_key, p);
     }
-    el.tbody.replaceChildren(frag);
-
-    for (const th of el.headers) {
-      const active = th.dataset.key === state.sortKey;
-      th.setAttribute("aria-sort", active ? (state.sortDir === "asc" ? "ascending" : "descending") : "none");
-    }
-    el.footnote.textContent = `Rank is by ${CONFIG.METRIC_LABEL.toLowerCase()} (${CONFIG.METRIC_HIGHER_IS_BETTER ? "higher" : "lower"} is better); equal accuracies share a rank and are listed by average time per example. Click a column header to sort.`;
+    const list = [...people.values()].map((p) => ({
+      ...p, sFinal: ((p.sA ?? 0) + (p.sB ?? 0)) / 2,
+    })).sort((a, b) => (b.sFinal - a.sFinal) || a.name.localeCompare(b.name));
+    let lastRank = 0, lastS = null;
+    return list.map((p, i) => {
+      const sKey = p.sFinal.toFixed(2);
+      const rank = sKey === lastS ? lastRank : i + 1;
+      lastRank = rank; lastS = sKey;
+      return { ...p, rank };
+    });
   }
-
-  function renderMyStatus() {
-    const m = state.mine;
-    const shape = `${m ? "mine" : "none"}|${storageOk}`;
-    const summary = m ? ` — ${CONFIG.METRIC_LABEL.toLowerCase()} ${fmtMetric(m.metric)}, rank #${m.rank}` : "";
-    el.btnOpenUpload.textContent = m ? "Edit / re-upload" : "Upload submission";
-
-    if (shape === state.statusShape && state.statusNodes) {
-      // same structure: update the text only (keeps keyboard focus on Edit/Delete, no live-region rebuild)
-      if (m) {
-        state.statusNodes.name.textContent = m.name;
-        state.statusNodes.summary.textContent = summary;
-      }
-      return;
-    }
-    state.statusShape = shape;
-    const box = el.myStatus;
-    box.replaceChildren();
-    box.className = "status-right my-status";
-    state.statusNodes = null;
-
-    if (!m) {
-      const span = document.createElement("span");
-      span.textContent = "You have not submitted yet.";
-      box.appendChild(span);
-    } else {
-      const badge = document.createElement("span");
-      badge.className = "badge";
-      badge.textContent = "your submission";
-      const text = document.createElement("span");
-      const strong = document.createElement("strong");
-      strong.textContent = m.name;
-      const summaryNode = document.createTextNode(summary);
-      text.append(strong, summaryNode);
-      const edit = document.createElement("button");
-      edit.type = "button";
-      edit.className = "btn btn-ghost btn-sm";
-      edit.textContent = "Edit / re-upload";
-      edit.addEventListener("click", openUploadDialog);
-      const del = document.createElement("button");
-      del.type = "button";
-      del.className = "btn btn-ghost btn-sm";
-      del.textContent = "Delete";
-      del.addEventListener("click", () => el.deleteDialog.showModal());
-      box.append(badge, text, edit, del);
-      state.statusNodes = { name: strong, summary: summaryNode };
-    }
-    if (!storageOk) {
-      const warn = document.createElement("span");
-      warn.className = "storage-warning";
-      warn.textContent = "Your browser blocks site storage: after a reload you will not be able to edit or delete your row.";
-      box.appendChild(warn);
-    }
-  }
-
-  function renderStats() {
-    el.statCount.textContent = String(state.rows.length);
-    el.statUpdated.textContent = fmtClock(new Date());
-  }
-
 
   // ---------------------------------------------------------------------------
-  // Plot: accuracy (%) vs. average time per example — SVG scatter, no libraries
+  // Plot geometry (pure, unit-tested): always-log x, iso-score diagonals
   // ---------------------------------------------------------------------------
-  const SVG_NS = "http://www.w3.org/2000/svg";
-  const plotHost = $("#plot");
-  const plotEmpty = $("#plot-empty");
-  const plotTooltip = $("#plot-tooltip");
+  const LOG2_10 = Math.log2(10);   // accuracy points per decade of latency at lambda=1
 
   function niceStep(rough) {
     const pow = 10 ** Math.floor(Math.log10(rough));
@@ -521,32 +454,89 @@
     for (let v = Math.ceil(min / step) * step; v <= max + step * 1e-9; v += step) out.push(+v.toPrecision(12));
     return out;
   }
-  const fmtTickX = (v) => (v >= 1 ? +v.toPrecision(6) : +v.toPrecision(3)).toString();
+  const fmtTickX = (v) => String(+(v >= 1 ? v.toPrecision(6) : v.toPrecision(3)));
 
-  // Around-the-point name placement (cartographic 8-position model).
-  // Every point gets its name in one of 8 slots around ITS OWN dot — right,
-  // left, above, below, then the corners — choosing the first slot that fits
-  // inside the plot and collides with no dot and no other name. Neighbouring
-  // points therefore end up labeled top/bottom/left/right of each other.
-  // The layout covers ALL points and is deterministic, so it is precomputed
-  // when the data loads; checkboxes only toggle visibility.
+  function plotLayout(rows, width, height) {
+    const M = { l: 58, r: 64, t: 34, b: 48 };
+    const iw = Math.max(60, width - M.l - M.r);
+    const ih = Math.max(60, height - M.t - M.b);
+    const clampL = (v) => Math.max(v, CONFIG.LATENCY_FLOOR_MS);
+    const us = rows.map((r) => Math.log10(clampL(r.latency_ms)));
+    let u0 = Math.floor(Math.min(...us));
+    let u1 = Math.ceil(Math.max(...us));
+    if (u1 === u0) u1 += 1;
+    const xTicks = [];
+    if (u1 - u0 <= 1) {
+      for (const m of [1, 2, 5]) xTicks.push(+(m * 10 ** u0).toPrecision(12));
+      xTicks.push(+(10 ** u1).toPrecision(12));
+    } else {
+      for (let e = u0; e <= u1; e++) xTicks.push(+(10 ** e).toPrecision(12));
+    }
+    const xPosU = (u) => M.l + (u - u0) / (u1 - u0) * iw;
+    const xPos = (v) => xPosU(Math.log10(clampL(v)));
+
+    const ys = rows.map((r) => r.metric * 100);
+    let ymin = Math.floor(Math.min(...ys)) - 2, ymax = Math.ceil(Math.max(...ys)) + 2;
+    if (ymax - ymin < 6) { ymin -= 2; ymax += 2; }
+    ymin = Math.max(0, ymin); ymax = Math.min(100, ymax);
+    if (!(ymax > ymin)) { ymin = 0; ymax = 100; }
+    const yTicks = linearTicks(ymin, ymax, 5);
+    const yPos = (v) => M.t + (1 - (v - ymin) / (ymax - ymin)) * ih;
+
+    // Iso-score lines: on this axis pair, S = y - LOG2_10 * lambda * u is a
+    // straight line rising LOG2_10 accuracy points per latency decade.
+    const slope = LOG2_10 * CONFIG.LAMBDA;
+    const sAt = (u, y) => y - slope * u;
+    const sMin = Math.min(sAt(u1, ymin), sAt(u1, ymax), sAt(u0, ymin));
+    const sMax = Math.max(sAt(u0, ymax), sAt(u0, ymin), sAt(u1, ymax));
+    let isoStep = 1;
+    for (const st of [1, 2, 5, 10, 20, 50]) {
+      isoStep = st;
+      if ((sMax - sMin) / st <= 6) break;
+    }
+    const iso = [];
+    for (let S = Math.ceil(sMin / isoStep) * isoStep; S <= sMax + 1e-9; S += isoStep) {
+      // y = S + slope*u; clip to the panel
+      let ua = u0, ub = u1;
+      let ya = S + slope * ua, yb = S + slope * ub;
+      if (yb < ymin || ya > ymax) continue;        // entirely outside
+      if (ya < ymin) { ua = (ymin - S) / slope; ya = ymin; }
+      if (yb > ymax) { ub = (ymax - S) / slope; yb = ymax; }
+      if (ub <= ua) continue;
+      iso.push({
+        s: +S.toPrecision(12),
+        x1: xPosU(ua), y1: yPos(ya),
+        x2: xPosU(ub), y2: yPos(yb),
+      });
+    }
+
+    const points = rows.map((r) => ({
+      row: r,
+      x: xPos(r.latency_ms),
+      y: yPos(r.metric * 100),
+    }));
+    return { M, iw, ih, width, height, u0, u1, xTicks, yTicks, xPos, yPos, iso, points };
+  }
+
+  // Around-the-point name placement (8-position model) — labels avoid other
+  // labels and every dot; deterministic; a label that cannot fit is hidden.
   const LABEL_CANDIDATES = ["r", "l", "t", "b", "tr", "br", "tl", "bl"];
   function labelCandidate(p, cand, w) {
     switch (cand) {
-      case "r":  return { x: p.x + 9, y: p.y + 4,  a: "start",  bx0: p.x + 9,         bx1: p.x + 9 + w };
-      case "l":  return { x: p.x - 9, y: p.y + 4,  a: "end",    bx0: p.x - 9 - w,     bx1: p.x - 9 };
-      case "t":  return { x: p.x,     y: p.y - 11, a: "middle", bx0: p.x - w / 2,     bx1: p.x + w / 2 };
-      case "b":  return { x: p.x,     y: p.y + 17, a: "middle", bx0: p.x - w / 2,     bx1: p.x + w / 2 };
-      case "tr": return { x: p.x + 7, y: p.y - 9,  a: "start",  bx0: p.x + 7,         bx1: p.x + 7 + w };
-      case "br": return { x: p.x + 7, y: p.y + 15, a: "start",  bx0: p.x + 7,         bx1: p.x + 7 + w };
-      case "tl": return { x: p.x - 7, y: p.y - 9,  a: "end",    bx0: p.x - 7 - w,     bx1: p.x - 7 };
-      default:   return { x: p.x - 7, y: p.y + 15, a: "end",    bx0: p.x - 7 - w,     bx1: p.x - 7 };
+      case "r":  return { x: p.x + 9, y: p.y + 4,  a: "start",  bx0: p.x + 9,     bx1: p.x + 9 + w };
+      case "l":  return { x: p.x - 9, y: p.y + 4,  a: "end",    bx0: p.x - 9 - w, bx1: p.x - 9 };
+      case "t":  return { x: p.x,     y: p.y - 11, a: "middle", bx0: p.x - w / 2, bx1: p.x + w / 2 };
+      case "b":  return { x: p.x,     y: p.y + 17, a: "middle", bx0: p.x - w / 2, bx1: p.x + w / 2 };
+      case "tr": return { x: p.x + 7, y: p.y - 9,  a: "start",  bx0: p.x + 7,     bx1: p.x + 7 + w };
+      case "br": return { x: p.x + 7, y: p.y + 15, a: "start",  bx0: p.x + 7,     bx1: p.x + 7 + w };
+      case "tl": return { x: p.x - 7, y: p.y - 9,  a: "end",    bx0: p.x - 7 - w, bx1: p.x - 7 };
+      default:   return { x: p.x - 7, y: p.y + 15, a: "end",    bx0: p.x - 7 - w, bx1: p.x - 7 };
     }
   }
   function placeLabels(points, widthOf, M, iw, ih) {
     const ASC = 9, DESC = 3, DOT = 7, PAD = 2;
     const bx0 = M.l + 1, bx1 = M.l + iw - 1, by0 = M.t + 1, by1 = M.t + ih - 1;
-    const boxes = [];   // placed label boxes [x0, x1, y0, y1]
+    const boxes = [];
     const dots = points.map((d) => [d.x - DOT, d.x + DOT, d.y - DOT, d.y + DOT]);
     const hitsBox = (b, o) => b[0] < o[1] && o[0] < b[1] && b[2] < o[3] && o[2] < b[3];
     for (const p of [...points].sort((a, b) => a.y - b.y || a.x - b.x)) {
@@ -568,42 +558,10 @@
     }
   }
 
-  // Pure geometry (no DOM) so it can be unit-tested: points, ticks, label spots.
-  function plotLayout(rows, width, height) {
-    const M = { l: 58, r: 34, t: 34, b: 48 };
-    const iw = Math.max(60, width - M.l - M.r);
-    const ih = Math.max(60, height - M.t - M.b);
-    const xs = rows.map((r) => r.avg_time_s);
-    const ys = rows.map((r) => r.metric * 100);
-    const xmin = Math.min(...xs), xmax = Math.max(...xs);
-    const xlog = xmin > 0 && xmax / xmin > 25;      // wide time ranges read better on a log axis
-    let x0, x1, xTicks;
-    if (xlog) {
-      x0 = Math.floor(Math.log10(xmin));
-      x1 = Math.ceil(Math.log10(xmax));
-      if (x1 === x0) x1 += 1;
-      xTicks = [];
-      for (let e = x0; e <= x1; e++) xTicks.push(+(10 ** e).toPrecision(12));
-    } else {
-      x0 = 0;
-      x1 = niceStep(Math.max(xmax, 1e-9) * 1.05);
-      xTicks = linearTicks(0, x1, 5);
-    }
-    const xPos = (v) => M.l + ((xlog ? Math.log10(v) : v) - x0) / (x1 - x0) * iw;
-    let ymin = Math.floor(Math.min(...ys)) - 2, ymax = Math.ceil(Math.max(...ys)) + 2;
-    if (ymax - ymin < 6) { ymin -= 2; ymax += 2; }
-    ymin = Math.max(0, ymin); ymax = Math.min(100, ymax);
-    const yTicks = linearTicks(ymin, ymax, 5);
-    const yPos = (v) => M.t + (1 - (v - ymin) / (ymax - ymin)) * ih;
-
-    const points = rows.map((r) => ({
-      row: r,
-      x: xPos(r.avg_time_s),
-      y: yPos(r.metric * 100),
-    }));
-    return { M, iw, ih, width, height, xlog, xTicks, yTicks, xPos, yPos, points };
-  }
-
+  // ---------------------------------------------------------------------------
+  // Plot rendering (per benchmark)
+  // ---------------------------------------------------------------------------
+  const SVG_NS = "http://www.w3.org/2000/svg";
   function svgEl(tag, attrs, text) {
     const node = document.createElementNS(SVG_NS, tag);
     for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
@@ -611,46 +569,48 @@
     return node;
   }
 
-  function showPlotTip(p, target) {
-    const box = plotTooltip.offsetParent || plotTooltip.parentElement;
+  function showPlotTip(bench, p, target) {
+    const P = plots[bench];
+    const box = P.tip.offsetParent || P.tip.parentElement;
     const boxRect = box.getBoundingClientRect();
-    const r = target.getBoundingClientRect();          // handles svg scaling & padding
+    const r = target.getBoundingClientRect();
     const cx = r.left + r.width / 2 - boxRect.left;
     const cy = r.top + r.height / 2 - boxRect.top;
-    plotTooltip.textContent = `${p.row.name} — ${fmtNumber(p.row.metric * 100, 2)} %, ${fmtTime(p.row.avg_time_s)} s/example`;
-    plotTooltip.hidden = false;
-    const half = plotTooltip.offsetWidth / 2;
-    plotTooltip.style.left = `${Math.min(Math.max(cx, half + 2), boxRect.width - half - 2)}px`;
-    plotTooltip.style.top = `${cy}px`;
-    plotTooltip.classList.toggle("below", cy < 46);
+    P.tip.textContent = `${p.row.name} — S ${fmtScore(p.row.s)}, ${fmtPct(p.row.metric)}, ${fmtLatency(p.row.latency_ms)} ms/ex`;
+    P.tip.hidden = false;
+    const half = P.tip.offsetWidth / 2;
+    P.tip.style.left = `${Math.min(Math.max(cx, half + 2), boxRect.width - half - 2)}px`;
+    P.tip.style.top = `${cy}px`;
+    P.tip.classList.toggle("below", cy < 46);
   }
-  function hidePlotTip() { plotTooltip.hidden = true; }
+  const hidePlotTip = (bench) => { plots[bench].tip.hidden = true; };
 
-  let lastPlotKey = null;
-
-  function renderPlot() {
-    if (!plotHost) return;
-    const rows = state.rows;
+  function renderPlot(bench) {
+    const P = plots[bench];
+    if (!P) return;
+    const rows = state.ladders[bench];
     if (!rows.length) {
-      lastPlotKey = "empty";
-      plotIndex = new Map();
-      plotHost.replaceChildren();
-      plotEmpty.hidden = false;
-      hidePlotTip();
+      P.lastKey = "empty";
+      P.index = new Map();
+      P.host.replaceChildren();
+      P.empty.hidden = false;
+      hidePlotTip(bench);
       return;
     }
-    plotEmpty.hidden = true;
-    const width = Math.max(320, plotHost.clientWidth || 640);
-    const key = width + "|" + rows.map((r) => `${r.id},${r.name},${r.metric},${r.avg_time_s},${r.mine ? 1 : 0}`).join(";");
-    if (key === lastPlotKey) return;                          // nothing changed: keep tooltip & focus alive
-    if (plotHost.contains(document.activeElement)) return;    // keyboard user inside the plot: retry next refresh
-    lastPlotKey = key;
-    hidePlotTip();
+    P.empty.hidden = true;
+    const width = Math.max(320, P.host.clientWidth || 640);
+    const key = width + "|" + rows.map((r) => `${r.id},${r.name},${r.metric},${r.latency_ms},${r.mine ? 1 : 0}`).join(";");
+    if (key === P.lastKey) { syncNameVisibility(); return; }
+    if (P.host.contains(document.activeElement)) return;   // keyboard user inside: retry next poll
+    P.lastKey = key;
+    hidePlotTip(bench);
+
     const height = Math.round(Math.min(400, Math.max(280, width * 0.42)));
     const L = plotLayout(rows, width, height);
+    const dotClass = (BENCHMARKS.find((b) => b.key === bench) || {}).dotClass || "";
     const svg = svgEl("svg", {
       viewBox: `0 0 ${width} ${height}`, height, role: "group",
-      "aria-label": `${CONFIG.METRIC_LABEL} versus average time per example — the same data as the table above.`,
+      "aria-label": `Benchmark ${bench}: accuracy versus latency — the same data as the table above.`,
     });
     svg.style.width = "100%";
     for (const t of L.yTicks) {
@@ -663,31 +623,34 @@
       svg.appendChild(svgEl("line", { x1: x, x2: x, y1: L.M.t, y2: L.M.t + L.ih, class: "plot-grid" }));
       svg.appendChild(svgEl("text", { x, y: L.M.t + L.ih + 16, class: "plot-tick" }, fmtTickX(t)));
     }
+    for (const line of L.iso) {
+      svg.appendChild(svgEl("line", { x1: line.x1, y1: line.y1, x2: line.x2, y2: line.y2, class: "plot-iso" }));
+      svg.appendChild(svgEl("text", { x: line.x2 + 5, y: line.y2 + 3.5, class: "plot-iso-label" }, `S ${line.s}`));
+    }
     svg.appendChild(svgEl("line", { x1: L.M.l, x2: L.M.l + L.iw, y1: L.M.t + L.ih, y2: L.M.t + L.ih, class: "plot-axis" }));
-    svg.appendChild(svgEl("text", { x: 10, y: 16, class: "plot-axis-title plot-axis-title-y" }, `Test ${CONFIG.METRIC_LABEL.toLowerCase()} (%)`));
+    svg.appendChild(svgEl("text", { x: 10, y: 16, class: "plot-axis-title plot-axis-title-y" }, "Test accuracy (%)"));
     svg.appendChild(svgEl("text", { x: L.M.l + L.iw / 2, y: L.height - 8, class: "plot-axis-title" },
-      `Average time per example (s)${L.xlog ? " — log scale" : ""}`));
-    plotIndex = new Map();
+      "Latency (ms per example) — log scale"));
+
+    P.index = new Map();
     for (const p of L.points) {
       const mine = p.row.mine;
-      const dot = svgEl("circle", { cx: p.x, cy: p.y, r: 5, class: "plot-dot" + (mine ? " mine" : "") });
+      const dot = svgEl("circle", { cx: p.x, cy: p.y, r: 5, class: `plot-dot ${dotClass}` + (mine ? " mine" : "") });
       svg.appendChild(dot);
       const hit = svgEl("circle", {
         cx: p.x, cy: p.y, r: 12, class: "plot-hit", tabindex: "0",
-        "aria-label": `${p.row.name}: ${fmtNumber(p.row.metric * 100, 2)} percent, ${fmtTime(p.row.avg_time_s)} seconds per example`,
+        "aria-label": `${p.row.name}: score ${fmtScore(p.row.s)}, ${fmtPct(p.row.metric)}, ${fmtLatency(p.row.latency_ms)} milliseconds per example`,
       });
-      const over = () => { dot.classList.add("hot"); showPlotTip(p, hit); };
-      const out = () => { dot.classList.remove("hot"); hidePlotTip(); };
+      const over = () => { dot.classList.add("hot"); showPlotTip(bench, p, hit); };
+      const out = () => { dot.classList.remove("hot"); hidePlotTip(bench); };
       hit.addEventListener("pointerenter", over);
       hit.addEventListener("pointerleave", out);
       hit.addEventListener("focus", over);
       hit.addEventListener("blur", out);
       svg.appendChild(hit);
-      plotIndex.set(p.row.id, { p, dot });
+      P.index.set(p.row.person_key, { p, dot });
     }
-    // names for the checked rows: place with estimated widths first…
-    // Names are laid out for EVERY point up front (stable, precomputed);
-    // the checkboxes only flip their visibility.
+    // precomputed name labels for every point; checkboxes only toggle visibility
     const estWidth = (p) => 10 + (p.row.name.length + (p.row.mine ? 6 : 0)) * 7;
     placeLabels(L.points, estWidth, L.M, L.iw, L.ih);
     const applyLabelGeom = (p, node) => {
@@ -699,72 +662,325 @@
     };
     const labelNodes = new Map();
     for (const p of L.points) {
-      const node = svgEl("text", {
-        class: "plot-name" + (p.row.mine ? " mine" : ""),
-      }, p.row.name + (p.row.mine ? " (you)" : ""));
-      node.style.visibility = "hidden";           // syncNameVisibility() decides
+      const node = svgEl("text", { class: "plot-name" + (p.row.mine ? " mine" : "") },
+        p.row.name + (p.row.mine ? " (you)" : ""));
+      node.style.visibility = "hidden";
       labelNodes.set(p, node);
       svg.appendChild(node);
       applyLabelGeom(p, node);
-      const entry = plotIndex.get(p.row.id);
+      const entry = P.index.get(p.row.person_key);
       if (entry) entry.label = node;
     }
-    plotHost.replaceChildren(svg);
-    // Re-place with the real rendered text widths (visibility:hidden still
-    // measures, unlike display:none), then show the checked ones.
-    if (L.points.length) {
-      try {
-        const measured = new Map();
-        for (const [p, node] of labelNodes) {
-          const w = node.getComputedTextLength();
-          measured.set(p, w > 0 ? w + 6 : estWidth(p));
-        }
-        placeLabels(L.points, (p) => measured.get(p), L.M, L.iw, L.ih);
-        for (const [p, node] of labelNodes) applyLabelGeom(p, node);
-      } catch (_) { /* measurement unsupported: estimated layout stands */ }
-    }
+    P.host.replaceChildren(svg);
+    try {   // re-place with real text widths (visibility:hidden still measures)
+      const measured = new Map();
+      for (const [p, node] of labelNodes) {
+        const w = node.getComputedTextLength();
+        measured.set(p, w > 0 ? w + 6 : estWidth(p));
+      }
+      placeLabels(L.points, (p) => measured.get(p), L.M, L.iw, L.ih);
+      for (const [p, node] of labelNodes) applyLabelGeom(p, node);
+    } catch (_) { /* estimated layout stands */ }
     syncNameVisibility();
   }
 
   function syncNameVisibility() {
-    for (const [id, entry] of plotIndex) {
-      if (entry.label) entry.label.style.visibility = state.labeled.has(id) ? "visible" : "hidden";
+    for (const bench of BENCH_KEYS) {
+      const P = plots[bench];
+      if (!P || !P.index) continue;
+      for (const [pk, entry] of P.index) {
+        if (entry.label) entry.label.style.visibility = state.labeled.has(pk) ? "visible" : "hidden";
+      }
     }
   }
 
-    function updateLabelAllButton() {
-    const total = state.rows.length;
-    el.btnLabelAll.disabled = total === 0;
-    el.btnLabelAll.textContent = total > 0 && state.labeled.size === total ? "Hide names" : "Show all names";
+  let spotlightPk = null;
+  function plotSpotlight(pk, on, tipBench) {
+    if (on && spotlightPk === pk && tipBench === undefined) return;
+    for (const bench of BENCH_KEYS) {
+      const P = plots[bench];
+      if (!P || !P.index) continue;
+      const prev = spotlightPk && P.index.get(spotlightPk);
+      if (prev) prev.dot.classList.remove("hot");
+      const entry = on && P.index.get(pk);
+      if (entry) {
+        entry.dot.classList.add("hot");
+        if (bench === tipBench) showPlotTip(bench, entry.p, entry.dot);
+        else hidePlotTip(bench);
+      } else {
+        hidePlotTip(bench);
+      }
+    }
+    spotlightPk = on ? pk : null;
   }
 
-  function setLabeled(id, on) {
-    if (on) state.labeled.add(id); else state.labeled.delete(id);
-    updateLabelAllButton();
+  // ---------------------------------------------------------------------------
+  // Tables
+  // ---------------------------------------------------------------------------
+  function td(className, text) {
+    const cell = document.createElement("td");
+    if (className) cell.className = className;
+    cell.textContent = text;
+    return cell;
+  }
+
+  const collator = new Intl.Collator(undefined, { sensitivity: "base", numeric: true });
+  const DEFAULT_DIR = { s: "desc", metric: "desc", latency_ms: "asc", name: "asc", submitted_at: "desc", rank: "asc", sA: "desc", sB: "desc", sFinal: "desc" };
+
+  function sortView(rows, view) {
+    const { sortKey, sortDir } = view;
+    if (sortKey === "rank" && sortDir === "asc") return rows;
+    const sign = sortDir === "asc" ? 1 : -1;
+    return rows.map((r, i) => [r, i]).sort(([a, ia], [b, ib]) => {
+      const av = a[sortKey], bv = b[sortKey];
+      let c;
+      if (typeof av === "number" || typeof bv === "number") {
+        c = ((av ?? -Infinity)) - ((bv ?? -Infinity));
+      } else c = collator.compare(String(av ?? ""), String(bv ?? ""));
+      if (c === 0) c = sign * (ia - ib);
+      return sign * c;
+    }).map(([r]) => r);
+  }
+
+  function updateAriaSort(headers, view) {
+    for (const th of headers) {
+      const active = th.dataset.key === view.sortKey;
+      th.setAttribute("aria-sort", active ? (view.sortDir === "asc" ? "ascending" : "descending") : "none");
+    }
+  }
+
+  function wireSort(headers, viewKey, rerender) {
+    for (const th of headers) {
+      th.querySelector(".sort-btn").addEventListener("click", () => {
+        const view = state.views[viewKey];
+        const key = th.dataset.key;
+        if (view.sortKey === key) view.sortDir = view.sortDir === "asc" ? "desc" : "asc";
+        else { view.sortKey = key; view.sortDir = DEFAULT_DIR[key] || "asc"; }
+        view.lastTableKey = null;
+        rerender();
+      });
+    }
+  }
+
+  function renderLadderTable(bench) {
+    const view = state.views[bench];
+    const dom = ladders[bench];
+    const rows = sortView(state.ladders[bench], view);
+    const key = `${view.sortKey}|${view.sortDir}|` +
+      rows.map((r) => `${r.id},${r.name},${r.s},${r.metric},${r.latency_ms},${r.rank},${r.mine ? 1 : 0},${r.submitted_at}`).join(";");
+    if (key === view.lastTableKey) return;
+    view.lastTableKey = key;
+
+    const frag = document.createDocumentFragment();
+    if (!rows.length) {
+      const tr = document.createElement("tr");
+      tr.className = "placeholder-row";
+      const cell = td(null, `No results on Benchmark ${bench} yet — be the first to upload one.`);
+      cell.colSpan = 7;
+      tr.appendChild(cell);
+      frag.appendChild(tr);
+    }
+    for (const r of rows) {
+      const tr = document.createElement("tr");
+      tr.dataset.pk = r.person_key;
+      if (r.mine) tr.classList.add("mine");
+      const checkCell = document.createElement("td");
+      checkCell.className = "check";
+      const check = document.createElement("input");
+      check.type = "checkbox";
+      check.className = "name-check";
+      check.checked = state.labeled.has(r.person_key);
+      check.setAttribute("aria-label", `Show ${r.name} on the plots`);
+      check.addEventListener("change", () => setLabeled(r.person_key, check.checked));
+      checkCell.appendChild(check);
+      tr.appendChild(checkCell);
+      const rankCell = td("rank" + (r.rank <= 3 ? " top3" : ""), String(r.rank));
+      tr.appendChild(rankCell);
+      const nameCell = td("name-cell", r.name);
+      if (r.mine) {
+        const badge = document.createElement("span");
+        badge.className = "badge";
+        badge.textContent = "you";
+        nameCell.appendChild(badge);
+      }
+      tr.appendChild(nameCell);
+      const sCell = td("num score-cell", fmtScore(r.s));
+      sCell.title = String(r.s);
+      tr.appendChild(sCell);
+      tr.appendChild(td("num", fmtPct(r.metric)));
+      tr.appendChild(td("num", fmtLatency(r.latency_ms) + (r.latency_ms < CONFIG.LATENCY_FLOOR_MS ? " †" : "")));
+      const dateCell = td("date", fmtDate(r.submitted_at));
+      dateCell.title = r.submitted_at;
+      tr.appendChild(dateCell);
+      frag.appendChild(tr);
+    }
+    dom.tbody.replaceChildren(frag);
+    updateAriaSort(dom.headers, view);
+    dom.countNote.textContent = `${state.ladders[bench].length} result${state.ladders[bench].length === 1 ? "" : "s"}`;
+  }
+
+  function renderOverallTable() {
+    const view = state.views.overall;
+    const rows = sortView(state.overall, view);
+    const key = `${view.sortKey}|${view.sortDir}|` +
+      rows.map((r) => `${r.pk},${r.name},${r.sA},${r.sB},${r.sFinal},${r.rank},${r.mine ? 1 : 0}`).join(";");
+    if (key === view.lastTableKey) return;
+    view.lastTableKey = key;
+
+    const frag = document.createDocumentFragment();
+    if (!rows.length) {
+      const tr = document.createElement("tr");
+      tr.className = "placeholder-row";
+      const cell = td(null, "The overall standing appears with the first result.");
+      cell.colSpan = 5;
+      tr.appendChild(cell);
+      frag.appendChild(tr);
+    }
+    for (const r of rows) {
+      const tr = document.createElement("tr");
+      tr.dataset.pk = r.pk;
+      if (r.mine) tr.classList.add("mine");
+      const rankCell = document.createElement("td");
+      rankCell.className = "rank";
+      const medal = document.createElement("span");
+      medal.className = "medal" + (r.rank <= 3 ? ` m${r.rank}` : "");
+      medal.textContent = r.rank;
+      rankCell.appendChild(medal);
+      tr.appendChild(rankCell);
+      const nameCell = td("name-cell", r.name);
+      if (r.mine) {
+        const badge = document.createElement("span");
+        badge.className = "badge";
+        badge.textContent = "you";
+        nameCell.appendChild(badge);
+      }
+      tr.appendChild(nameCell);
+      const a = td("num" + (r.sA === null ? " missing" : ""), fmtScore(r.sA));
+      const b = td("num" + (r.sB === null ? " missing" : ""), fmtScore(r.sB));
+      tr.appendChild(a);
+      tr.appendChild(b);
+      tr.appendChild(td("num score-cell", fmtScore(r.sFinal)));
+      frag.appendChild(tr);
+    }
+    el.overallBody.replaceChildren(frag);
+    updateAriaSort(el.overallTable.querySelectorAll("th[data-key]"), view);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Name checkboxes / show-all buttons (shared, person-keyed)
+  // ---------------------------------------------------------------------------
+  function allPersonKeys() {
+    return new Set(state.rows.map((r) => r.person_key));
+  }
+  function updateLabelAllButtons() {
+    const total = allPersonKeys().size;
+    const all = total > 0 && state.labeled.size >= total;
+    for (const bench of BENCH_KEYS) {
+      const btn = ladders[bench] && ladders[bench].btnLabelAll;
+      if (!btn) continue;
+      btn.disabled = total === 0;
+      btn.textContent = all ? "Hide names" : "Show all names";
+    }
+  }
+  function syncCheckboxes() {
+    for (const bench of BENCH_KEYS) {
+      const dom = ladders[bench];
+      if (!dom) continue;
+      for (const box of dom.tbody.querySelectorAll("input.name-check")) {
+        const tr = box.closest("tr[data-pk]");
+        if (tr) box.checked = state.labeled.has(tr.dataset.pk);
+      }
+    }
+  }
+  function setLabeled(pk, on) {
+    if (on) state.labeled.add(pk); else state.labeled.delete(pk);
+    updateLabelAllButtons();
+    syncCheckboxes();
     syncNameVisibility();
   }
 
-  // Table row hover spotlights the matching dot (and names it).
-  let plotIndex = new Map();
-  let spotlightId = null;
-  function plotSpotlight(id, on) {
-    if (on && spotlightId === id) return;
-    if (spotlightId) {
-      const prev = plotIndex.get(spotlightId);
-      if (prev) prev.dot.classList.remove("hot");
-    }
-    spotlightId = on ? id : null;
-    const entry = on ? plotIndex.get(id) : null;
-    if (!entry) { hidePlotTip(); return; }
-    entry.dot.classList.add("hot");
-    showPlotTip(entry.p, entry.dot);
+  // ---------------------------------------------------------------------------
+  // Status panel: one slot per benchmark + overall line
+  // ---------------------------------------------------------------------------
+  function myOverall() {
+    return state.overall.find((p) => p.mine) || null;
   }
 
-  let plotResizeTimer = null;
-  window.addEventListener("resize", () => {
-    clearTimeout(plotResizeTimer);
-    plotResizeTimer = setTimeout(renderPlot, 150);
-  });
+  function renderMyStatus() {
+    const mA = state.mine.A, mB = state.mine.B;
+    const ov = myOverall();
+    const key = [mA && `${mA.id},${mA.s},${mA.rank}`, mB && `${mB.id},${mB.s},${mB.rank}`,
+      ov && `${ov.rank},${ov.sFinal}`, storageOk].join("|");
+    if (key === state.statusKey) return;
+    state.statusKey = key;
+
+    const box = el.myStatus;
+    box.replaceChildren();
+    if (!mA && !mB) {
+      const span = document.createElement("span");
+      span.textContent = "You have not submitted yet.";
+      box.appendChild(span);
+    } else {
+      for (const bench of BENCH_KEYS) {
+        const m = state.mine[bench];
+        const slot = document.createElement("span");
+        slot.className = "slot";
+        const tag = document.createElement("span");
+        tag.className = "slot-bench" + (bench === "B" ? " bench-b" : "");
+        tag.textContent = bench;
+        slot.appendChild(tag);
+        if (m) {
+          const txt = document.createElement("span");
+          txt.append(`S ${fmtScore(m.s)} · #${m.rank} `);
+          slot.appendChild(txt);
+          const rep = document.createElement("button");
+          rep.type = "button";
+          rep.className = "btn btn-ghost btn-sm";
+          rep.textContent = "Replace";
+          rep.addEventListener("click", () => openUploadDialog(bench));
+          const del = document.createElement("button");
+          del.type = "button";
+          del.className = "btn btn-ghost btn-sm";
+          del.textContent = "Delete";
+          del.addEventListener("click", () => openDeleteDialog(bench));
+          slot.append(rep, del);
+        } else {
+          const txt = document.createElement("span");
+          txt.className = "slot-missing";
+          txt.textContent = "no result — counts as 0 ";
+          slot.appendChild(txt);
+          const up = document.createElement("button");
+          up.type = "button";
+          up.className = "btn btn-ghost btn-sm";
+          up.textContent = "Upload";
+          up.addEventListener("click", () => openUploadDialog(bench));
+          slot.appendChild(up);
+        }
+        box.appendChild(slot);
+      }
+      if (ov) {
+        const line = document.createElement("span");
+        line.className = "slot-overall";
+        const strong = document.createElement("strong");
+        strong.textContent = `Overall S ${fmtScore(ov.sFinal)} (#${ov.rank})`;
+        line.appendChild(strong);
+        box.appendChild(line);
+      }
+    }
+    if (!storageOk) {
+      const warn = document.createElement("span");
+      warn.className = "storage-warning";
+      warn.textContent = "Your browser blocks site storage: after a reload you will not be able to edit or delete your results.";
+      box.appendChild(warn);
+    }
+  }
+
+  function renderStats() {
+    el.statCount.textContent = String(allPersonKeys().size);
+    el.statA.textContent = String(state.ladders.A.length);
+    el.statB.textContent = String(state.ladders.B.length);
+    el.statUpdated.textContent = fmtClock(new Date());
+  }
 
   // ---------------------------------------------------------------------------
   // Data loading
@@ -773,16 +989,25 @@
     const seq = ++state.refreshSeq;
     try {
       const data = await api("GET", "/api/submissions");
-      if (seq !== state.refreshSeq) return;            // a newer refresh already landed
-      state.rows = computeRanks(data.submissions || []);
-      state.mine = state.rows.find((r) => r.mine) || null;
-      const ids = new Set(state.rows.map((r) => r.id));
-      for (const id of state.labeled) if (!ids.has(id)) state.labeled.delete(id);
-      updateLabelAllButton();
-      renderTable();
+      if (seq !== state.refreshSeq) return;
+      state.rows = (data.submissions || []).filter((r) => typeof r.s === "number");
+      for (const bench of BENCH_KEYS) {
+        state.ladders[bench] = computeRanks(state.rows.filter((r) => r.benchmark === bench));
+        state.mine[bench] = state.ladders[bench].find((r) => r.mine) || null;
+      }
+      state.overall = overallStandings(state.rows);
+      const alive = allPersonKeys();
+      for (const pk of state.labeled) if (!alive.has(pk)) state.labeled.delete(pk);
+      const myPk = (state.mine.A || state.mine.B || {}).person_key;
+      if (!state.seededSelf && myPk) { state.labeled.add(myPk); state.seededSelf = true; }
+      renderOverallTable();
+      for (const bench of BENCH_KEYS) {
+        renderLadderTable(bench);
+        renderPlot(bench);
+      }
       renderMyStatus();
       renderStats();
-      renderPlot();
+      updateLabelAllButtons();
     } catch (err) {
       if (seq !== state.refreshSeq) return;
       if (!silent) showToast(`Could not load the leaderboard: ${err.message}`, "error");
@@ -791,8 +1016,7 @@
   }
 
   function scheduleRefresh() {
-    clearInterval(state.refreshTimer);
-    state.refreshTimer = setInterval(() => {
+    setInterval(() => {
       if (document.visibilityState === "visible") refresh();
     }, CONFIG.REFRESH_MS);
   }
@@ -800,29 +1024,46 @@
   // ---------------------------------------------------------------------------
   // Upload dialog
   // ---------------------------------------------------------------------------
-  function submitLabel() { return state.mine ? "Replace my submission" : "Submit"; }
+  function submitLabel(entries) {
+    if (!entries || !entries.length) return "Submit";
+    if (entries.length === 2) {
+      const rep = entries.map((e) => !!state.mine[e.benchmark]);
+      if (rep[0] && rep[1]) return "Replace both results";
+      if (!rep[0] && !rep[1]) return "Submit both results";
+      const parts = entries.map((e) => `${state.mine[e.benchmark] ? "replace" : "submit"} ${e.benchmark}`);
+      return (parts[0][0].toUpperCase() + parts[0].slice(1)) + ", " + parts[1];
+    }
+    const b = entries[0].benchmark;
+    return state.mine[b] ? `Replace my Benchmark ${b} result` : `Submit Benchmark ${b} result`;
+  }
 
   function resetUploadDialog() {
     state.pending = null;
+    state.pendingFile = null;
     state.fileSeq++;
     el.fileInput.value = "";
     el.dropzoneFile.textContent = "";
     el.validationBox.hidden = true;
     el.validationBox.replaceChildren();
-    el.validationBox.className = "validation";
+    el.warnBox.hidden = true;
+    el.warnBox.replaceChildren();
+    el.benchChooser.hidden = true;
+    for (const r of el.benchChooser.querySelectorAll("input")) r.checked = false;
     el.previewBox.hidden = true;
-    el.previewGrid.replaceChildren();
+    el.previewEntries.replaceChildren();
     el.btnSubmitUpload.disabled = true;
-    el.btnSubmitUpload.textContent = submitLabel();
-    el.uploadTitle.textContent = state.mine ? "Re-upload your submission" : "Upload submission";
+    el.btnSubmitUpload.textContent = "Submit";
+    const scope = state.uploadScope;
+    el.uploadTitle.textContent = scope
+      ? (state.mine[scope] ? `Replace your Benchmark ${scope} result` : `Upload your Benchmark ${scope} result`)
+      : "Upload results";
     el.dialogNote.textContent = !storageOk
-      ? "Storage is blocked in this browser — you will not be able to edit or delete this row after a reload."
-      : state.mine
-        ? "This will replace your current row on the leaderboard."
-        : "Your browser remembers this upload so you can edit or delete it later.";
+      ? "Storage is blocked in this browser — you will not be able to edit or delete these results after a reload."
+      : "Your browser remembers this upload so you can replace or delete each result later.";
   }
 
-  function openUploadDialog() {
+  function openUploadDialog(scope) {
+    state.uploadScope = BENCH_KEYS.includes(scope) ? scope : null;
     resetUploadDialog();
     el.uploadDialog.showModal();
   }
@@ -844,22 +1085,102 @@
     }
   }
 
-  function showPreview(entry) {
-    el.previewGrid.replaceChildren();
-    for (const f of FIELDS) {
-      const dt = document.createElement("dt"); dt.textContent = FIELD_LABELS[f];
-      const dd = document.createElement("dd");
-      dd.textContent = NUMBER_FIELDS.includes(f) ? (f === "metric" ? fmtMetric(entry[f]) : fmtTime(entry[f])) : entry[f];
-      el.previewGrid.append(dt, dd);
+  function showWarnings(warnings) {
+    el.warnBox.replaceChildren();
+    el.warnBox.hidden = warnings.length === 0;
+    if (!warnings.length) return;
+    const heading = document.createElement("strong");
+    heading.textContent = "Worth a second look (you can still submit):";
+    const ul = document.createElement("ul");
+    for (const w of warnings) { const li = document.createElement("li"); li.textContent = w; ul.appendChild(li); }
+    el.warnBox.append(heading, ul);
+  }
+
+  function collectWarnings(entries) {
+    const warnings = [];
+    for (const e of entries) {
+      const tag = entries.length > 1 ? `Benchmark ${e.benchmark}: ` : "";
+      if (e.latency_ms > 0 && e.latency_ms < 0.05) warnings.push(`${tag}faster than 20 000 examples/s — did you report seconds instead of milliseconds?`);
+      if (e.latency_ms <= CONFIG.LATENCY_FLOOR_MS) warnings.push(`${tag}latency is clipped to the 0.01 ms/example floor when scoring.`);
+      if (e.metric > 0.999) warnings.push(`${tag}accuracy above 99.9 % — double-check the fraction.`);
+    }
+    if (entries.length === 1) {
+      const other = BENCH_KEYS.find((b) => b !== entries[0].benchmark);
+      if (!state.mine[other]) {
+        warnings.push(`This file covers Benchmark ${entries[0].benchmark} only. Benchmark ${other} still counts as 0 in your overall score — the assignment asks for both.`);
+      }
+    }
+    return warnings;
+  }
+
+  function showPreview(entries) {
+    el.previewEntries.replaceChildren();
+    for (const e of entries) {
+      const wrap = document.createElement("div");
+      wrap.className = "preview-row";
+      const h = document.createElement("h4");
+      h.textContent = `Benchmark ${e.benchmark}`;
+      wrap.appendChild(h);
+      const dl = document.createElement("dl");
+      dl.className = "preview-grid";
+      const add = (k, v, cls) => {
+        const dt = document.createElement("dt"); dt.textContent = k;
+        const dd = document.createElement("dd"); dd.textContent = v;
+        if (cls) dd.className = cls;
+        dl.append(dt, dd);
+      };
+      add("Name", e.name);
+      add("Accuracy", fmtPct(e.metric));
+      add("Latency", `${fmtLatency(e.latency_ms)} ms/example`);
+      add("Score S", fmtScore(scoreOf(e)), "score-cell");
+      wrap.appendChild(dl);
+      const current = state.mine[e.benchmark];
+      if (current) {
+        const delta = document.createElement("p");
+        delta.className = "preview-delta";
+        delta.textContent = `replaces your current Benchmark ${e.benchmark} result — S ${fmtScore(current.s)} → ${fmtScore(scoreOf(e))}`;
+        wrap.appendChild(delta);
+      }
+      el.previewEntries.appendChild(wrap);
     }
     el.previewBox.hidden = false;
+  }
+
+  function runValidation(fileName, text, injectBench) {
+    const { clean, errors, needsBenchChoice } = parseSubmissionFile(fileName, text, injectBench);
+    if (needsBenchChoice && !injectBench && !state.uploadScope) {
+      el.benchChooser.hidden = false;
+      showValidation(["The file does not say which benchmark it is — pick one below."]);
+      return;
+    }
+    el.benchChooser.hidden = true;
+    if (errors.length) { showValidation(errors); showWarnings([]); return; }
+    // scoped-upload rules
+    if (state.uploadScope) {
+      const benches = clean.map((e) => e.benchmark);
+      if (!benches.includes(state.uploadScope)) {
+        showValidation([`This file is Benchmark ${benches.join(" and ")}, but you opened it from the Benchmark ${state.uploadScope} card. Fix the file, or upload it from the Benchmark ${benches[0]} card.`]);
+        showWarnings([]);
+        return;
+      }
+    }
+    state.pending = clean;
+    showValidation([], { okMessage: "Looks good — review the parsed results below and press Submit." });
+    showWarnings(collectWarnings(clean));
+    showPreview(clean);
+    el.btnSubmitUpload.disabled = false;
+    el.btnSubmitUpload.textContent = submitLabel(clean);
   }
 
   async function handleFile(file) {
     const seq = ++state.fileSeq;
     el.previewBox.hidden = true;
+    el.warnBox.hidden = true;
+    el.benchChooser.hidden = true;
     state.pending = null;
+    state.pendingFile = null;
     el.btnSubmitUpload.disabled = true;
+    el.btnSubmitUpload.textContent = "Submit";
     if (!file) {
       el.dropzoneFile.textContent = "";
       showValidation(["No file received — drop a single .csv or .json file."]);
@@ -867,19 +1188,15 @@
     }
     el.dropzoneFile.textContent = `${file.name} (${file.size.toLocaleString()} bytes)`;
     if (file.size > CONFIG.MAX_FILE_BYTES) {
-      showValidation([`File is too large (${file.size.toLocaleString()} bytes). A submission is a single row and should be well under 1 KB.`]);
+      showValidation([`File is too large (${file.size.toLocaleString()} bytes). Results are a couple of rows — well under 1 KB.`]);
       return;
     }
     let text;
     try { text = await file.text(); }
     catch (e) { if (seq === state.fileSeq) showValidation([`Could not read the file: ${e.message}`]); return; }
-    if (seq !== state.fileSeq) return;          // another file was chosen (or the dialog was reset) meanwhile
-    const { clean, errors } = parseSubmissionFile(file.name, text);
-    if (errors.length) { showValidation(errors); return; }
-    state.pending = clean;
-    showValidation([], { okMessage: "Looks good — review the parsed values below and press Submit." });
-    showPreview(clean);
-    el.btnSubmitUpload.disabled = false;
+    if (seq !== state.fileSeq) return;
+    state.pendingFile = { name: file.name, text };
+    runValidation(file.name, text, state.uploadScope || undefined);
   }
 
   function setSubmitting(on) {
@@ -887,7 +1204,8 @@
     el.btnSubmitUpload.disabled = on;
     el.btnCancelUpload.disabled = on;
     el.btnCloseUpload.disabled = on;
-    el.btnSubmitUpload.textContent = on ? "Submitting…" : submitLabel();
+    if (on) el.btnSubmitUpload.textContent = "Submitting…";
+    else el.btnSubmitUpload.textContent = state.pending ? submitLabel(state.pending) : "Submit";
   }
 
   async function submitPending() {
@@ -898,25 +1216,35 @@
       setSubmitting(false);
       el.uploadDialog.close();
       await refresh({ silent: false });
-      showToast(res.created ? "Submission added to the leaderboard." : "Submission updated.", "success");
+      const benches = (res.submissions || []).map((x) => x.benchmark).join(" and ");
+      showToast(`Result${res.submissions && res.submissions.length > 1 ? "s" : ""} for Benchmark ${benches} ${res.created ? "added to" : "updated on"} the board.`, "success");
     } catch (err) {
       setSubmitting(false);
       el.btnSubmitUpload.disabled = !state.pending;
-      // 422 = server-side validation, 409 = duplicate person, 507 = board full, 0 = network, 5xx = server
       const details = err.details && err.details.length ? err.details : [err.message];
       const title = err.status === 422 ? "The server rejected the file:" : err.status === 409 || err.status === 507 ? "Submission refused:" : "Could not submit:";
-      if (el.uploadDialog.open) showValidation(details, { title });   // a toast would be hidden behind the modal
+      if (el.uploadDialog.open) showValidation(details, { title });
       else showToast(`Submission failed: ${details[0]}`, "error");
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Delete (per benchmark)
+  // ---------------------------------------------------------------------------
+  function openDeleteDialog(bench) {
+    state.deleteBench = bench;
+    el.deleteTitle.textContent = `Delete your Benchmark ${bench} result?`;
+    el.deleteHint.textContent = `This removes your row from the Benchmark ${bench} ladder (the other benchmark is untouched). You can upload a new file at any time.`;
+    el.deleteDialog.showModal();
+  }
   async function deleteMine() {
+    const bench = state.deleteBench;
     el.btnConfirmDelete.disabled = true;
     try {
-      await api("DELETE", "/api/submissions/mine");
+      await api("DELETE", `/api/submissions/mine/${bench}`);
       el.deleteDialog.close();
       await refresh({ silent: false });
-      showToast("Your submission was deleted.", "success");
+      showToast(`Your Benchmark ${bench} result was deleted.`, "success");
     } catch (err) {
       el.deleteDialog.close();
       showToast(`Delete failed: ${err.message}`, "error");
@@ -927,7 +1255,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Toast (kept in the DOM so the live region reliably announces)
+  // Toast
   // ---------------------------------------------------------------------------
   let toastTimer = null;
   function showToast(message, kind = "") {
@@ -938,38 +1266,98 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Ladder sections from the template
+  // ---------------------------------------------------------------------------
+  function initLadders() {
+    const template = $("#ladder-template");
+    for (const bench of BENCHMARKS) {
+      const section = $(`#benchmark-${bench.key.toLowerCase()}`);
+      section.appendChild(template.content.cloneNode(true));
+      section.querySelector(".ladder-title").textContent = bench.label;
+      section.querySelector(".ladder-sub").textContent = bench.sub;
+      section.querySelector(".table-scroll").setAttribute("aria-label", `${bench.label} ladder table`);
+      const btnUpload = section.querySelector(".ladder-upload");
+      btnUpload.textContent = `Upload to ${bench.label}`;
+      btnUpload.addEventListener("click", () => openUploadDialog(bench.key));
+      const dom = {
+        section,
+        tbody: section.querySelector("tbody"),
+        headers: section.querySelectorAll("th[data-key]"),
+        countNote: section.querySelector(".ladder-count"),
+        btnLabelAll: section.querySelector(".btn-label-all"),
+      };
+      ladders[bench.key] = dom;
+      plots[bench.key] = {
+        host: section.querySelector(".plot-host"),
+        empty: section.querySelector(".plot-placeholder"),
+        tip: section.querySelector(".plot-tooltip"),
+        index: new Map(),
+        lastKey: null,
+      };
+      plots[bench.key].empty.textContent = `The plot appears with the first ${bench.label} result.`;
+      wireSort(dom.headers, bench.key, () => renderLadderTable(bench.key));
+      dom.btnLabelAll.addEventListener("click", () => {
+        const total = allPersonKeys();
+        const all = total.size > 0 && state.labeled.size >= total.size;
+        if (all) state.labeled.clear();
+        else for (const pk of total) state.labeled.add(pk);
+        updateLabelAllButtons();
+        syncCheckboxes();
+        syncNameVisibility();
+      });
+      dom.tbody.addEventListener("mouseover", (e) => {
+        const tr = e.target.closest("tr[data-pk]");
+        if (tr) plotSpotlight(tr.dataset.pk, true, bench.key);
+      });
+      dom.tbody.addEventListener("mouseleave", () => plotSpotlight(spotlightPk, false));
+    }
+    el.overallBody.addEventListener("mouseover", (e) => {
+      const tr = e.target.closest("tr[data-pk]");
+      if (tr) plotSpotlight(tr.dataset.pk, true, null);
+    });
+    el.overallBody.addEventListener("mouseleave", () => plotSpotlight(spotlightPk, false));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Section nav scroll-spy (fails safe: anchors still work as plain links)
+  // ---------------------------------------------------------------------------
+  function initScrollSpy() {
+    if (!("IntersectionObserver" in window)) return;
+    const sections = document.querySelectorAll("section.board-section");
+    const byId = {};
+    for (const a of el.sectionNav) byId[a.getAttribute("href").slice(1)] = a;
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        for (const a of el.sectionNav) a.removeAttribute("aria-current");
+        const a = byId[entry.target.id];
+        if (a) a.setAttribute("aria-current", "true");
+      }
+    }, { rootMargin: "-30% 0px -60% 0px" });
+    for (const s of sections) observer.observe(s);
+  }
+
+  // ---------------------------------------------------------------------------
   // Events
   // ---------------------------------------------------------------------------
   function wireEvents() {
-    el.metricHeader.textContent = CONFIG.METRIC_LABEL;
+    wireSort(el.overallTable.querySelectorAll("th[data-key]"), "overall", renderOverallTable);
 
-    for (const th of el.headers) {
-      th.querySelector(".sort-btn").addEventListener("click", () => {
-        const key = th.dataset.key;
-        if (state.sortKey === key) {
-          state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
-        } else {
-          state.sortKey = key;
-          // sensible default direction per column
-          state.sortDir = (key === "metric" && CONFIG.METRIC_HIGHER_IS_BETTER) || key === "submitted_at" ? "desc" : "asc";
-        }
-        renderTable();
-      });
-    }
-
-    el.btnOpenUpload.addEventListener("click", openUploadDialog);
+    el.btnOpenUpload.addEventListener("click", () => openUploadDialog(null));
     el.btnCloseUpload.addEventListener("click", () => el.uploadDialog.close());
     el.btnCancelUpload.addEventListener("click", () => el.uploadDialog.close());
     el.btnSubmitUpload.addEventListener("click", submitPending);
     el.fileInput.addEventListener("change", () => {
       const file = el.fileInput.files[0];
-      el.fileInput.value = "";       // so picking the same (fixed) file again fires 'change'
+      el.fileInput.value = "";
       handleFile(file);
     });
-    // the form never submits the classic way (Enter key etc.)
     $("#upload-form").addEventListener("submit", (e) => e.preventDefault());
+    el.benchChooser.addEventListener("change", (e) => {
+      const choice = e.target && e.target.value;
+      if (choice && state.pendingFile) runValidation(state.pendingFile.name, state.pendingFile.text, choice);
+    });
 
-    // drag & drop (and never let the browser navigate to a dropped file)
     ["dragenter", "dragover"].forEach((ev) => el.dropzone.addEventListener(ev, (e) => {
       e.preventDefault(); el.dropzone.classList.add("dragover");
     }));
@@ -986,30 +1374,16 @@
     el.btnCancelDelete.addEventListener("click", () => el.deleteDialog.close());
     el.btnConfirmDelete.addEventListener("click", deleteMine);
 
-    // close dialogs when clicking on the backdrop (not while a submission is in flight)
     for (const dlg of [el.uploadDialog, el.deleteDialog]) {
       dlg.addEventListener("click", (e) => { if (e.target === dlg && !state.submitting) dlg.close(); });
     }
-    el.uploadDialog.addEventListener("cancel", (e) => { if (state.submitting) e.preventDefault(); });   // Escape key
+    el.uploadDialog.addEventListener("cancel", (e) => { if (state.submitting) e.preventDefault(); });
 
-    el.btnLabelAll.addEventListener("click", () => {
-      if (state.labeled.size === state.rows.length && state.rows.length > 0) state.labeled.clear();
-      else state.rows.forEach((r) => state.labeled.add(r.id));
-      updateLabelAllButton();
-      for (const box of el.tbody.querySelectorAll("input.name-check")) {
-        const tr = box.closest("tr[data-id]");
-        if (tr) box.checked = state.labeled.has(tr.dataset.id);
-      }
-      syncNameVisibility();
+    let resizeTimer = null;
+    window.addEventListener("resize", () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => { for (const bench of BENCH_KEYS) renderPlot(bench); }, 150);
     });
-
-    // hovering a table row spotlights its dot on the plot
-    el.tbody.addEventListener("mouseover", (e) => {
-      const tr = e.target.closest("tr[data-id]");
-      if (tr) plotSpotlight(tr.dataset.id, true);
-    });
-    el.tbody.addEventListener("mouseleave", () => plotSpotlight(spotlightId, false));
-
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "visible") refresh();
     });
@@ -1018,18 +1392,18 @@
   // ---------------------------------------------------------------------------
   // Boot
   // ---------------------------------------------------------------------------
+  initLadders();
   wireEvents();
+  initScrollSpy();
   renderMyStatus();
   refresh({ silent: false });
   scheduleRefresh();
-  // Web fonts load asynchronously: label widths measured against the fallback
-  // font are stale once IBM Plex swaps in, so lay the plot out again then.
   if (document.fonts) {
-    const remeasure = () => { lastPlotKey = null; renderPlot(); };
+    const remeasure = () => { for (const bench of BENCH_KEYS) { plots[bench].lastKey = null; renderPlot(bench); } };
     if (document.fonts.ready && document.fonts.ready.then) document.fonts.ready.then(remeasure);
     if (document.fonts.addEventListener) document.fonts.addEventListener("loadingdone", remeasure);
   }
 
   // exposed for debugging / tests in the console
-  window.Leaderboard = { parseSubmissionFile, validateEntry, computeRanks, plotLayout, placeLabels, CONFIG };
+  window.Leaderboard = { parseSubmissionFile, validateEntry, computeRanks, overallStandings, plotLayout, placeLabels, scoreOf, CONFIG };
 })();

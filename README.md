@@ -1,17 +1,22 @@
 # Ostr-AI 2026 — Final Project Leaderboard
 
 A small, self-contained leaderboard for the Ostr-AI AI Summer School 2026
-final projects. Students upload a one-row `.csv`/`.json` with their result;
-the table updates live and can be sorted by any column.
+final project — the **Efficient Intent Classification Challenge** (two benchmarks,
+A and B). Students upload a `.csv`/`.json` with one result per benchmark; the
+ladders update live and rank by `S = 100 × accuracy − log₂(latency in ms)`.
 
 <p align="center"><img src="static/logo.png" alt="Ostr-AI logo" width="160"></p>
 
 ## Features
 
-- **Sortable table** — rank, Name, Accuracy, Avg time (s) per example, Submitted.
-  Rank is computed from the accuracy (ties broken by average time per example).
-- **Accuracy-vs-speed plot** — an SVG scatter under the table (accuracy % against
-  average time per example, log x-axis when the spread is wide); hovering a point or its table row shows the name.
+- **Two ladders + overall standing** — one section per benchmark (sortable table
+  + accuracy-vs-latency scatter with equal-score guide lines), plus an overall
+  table of `S_final = (S_A + S_B) / 2`. Sticky section nav, per-benchmark colours.
+- **Workshop scoring** — rank by `S = 100 × accuracy − λ·log₂(L / L_ref)`
+  (λ=1, L_ref=1 ms, floor 0.01 ms), computed server-side; the plot's dashed
+  iso-score diagonals make the trade-off visible.
+- **Assignment on the site** — `/assignment` renders `workshop/ASSIGNMENT.md`
+  (instructor notes are git-ignored and never served or deployed).
 - **Upload / edit / delete** — the file is parsed and validated **in the browser**
   (required columns, numeric types, exactly one row, friendly error messages) and
   shown as a preview before it is sent. The server re-validates defensively.
@@ -76,7 +81,8 @@ It is also rendered at `/guide` on the running site. Templates:
 
 | What                       | Where                                            |
 |----------------------------|--------------------------------------------------|
-| Metric name / direction    | `static/app.js` → `CONFIG.METRIC_LABEL` (default "Accuracy"), `CONFIG.METRIC_HIGHER_IS_BETTER` |
+| Scoring constants (λ, L_ref, floor) | `app.py` (`LAMBDA`, `L_REF_MS`, `LATENCY_FLOOR_MS`) and `static/app.js` `CONFIG` (keep in sync) |
+| Benchmark names / subtitles | `static/app.js` → `BENCHMARKS`                  |
 | Refresh interval           | `static/app.js` → `CONFIG.REFRESH_MS`            |
 | Validation rules           | `app.py` → `validate_entry`, `static/app.js` → `validateEntry`, and the limits quoted in `submit_readme.md` (keep all three in sync) |
 | Row cap (anti-abuse)       | `app.py` → `MAX_SUBMISSIONS` (default 500)       |
@@ -86,16 +92,17 @@ It is also rendered at `/guide` on the running site. Templates:
 
 | Method   | Path                     | Purpose                                              |
 |----------|--------------------------|------------------------------------------------------|
-| `GET`    | `/api/submissions`       | all rows (`mine: true` on the caller's own row)      |
-| `GET`    | `/api/submissions/mine`  | the caller's row or `null`                           |
-| `PUT`    | `/api/submissions/mine`  | create or replace the caller's row (JSON body)       |
-| `DELETE` | `/api/submissions/mine`  | delete the caller's row                              |
+| `GET`    | `/api/submissions`       | all rows (with `benchmark`, server-computed `s`, `mine`) |
+| `GET`    | `/api/submissions/mine`  | the caller's rows (one per benchmark)                |
+| `PUT`    | `/api/submissions/mine`  | upsert one entry or an array of two (all-or-nothing) |
+| `DELETE` | `/api/submissions/mine`  | delete all the caller's rows                         |
+| `DELETE` | `/api/submissions/mine/<A\|B>` | delete one benchmark's row                      |
 | `DELETE` | `/api/submissions/<id>`  | organiser delete (header `X-Admin-Key`)              |
 
 The caller is identified by the `X-Owner-Token` header (the browser sends it
-automatically). A `name` (case-insensitive) can only appear
-once: a second browser uploading the same name gets `409` and is told to ask an
-organiser.
+automatically). A `name` (case-insensitive) can appear once **per benchmark**;
+a second browser uploading the same name gets `409`. One token must use the same
+name on both benchmarks (`422` otherwise).
 
 **Organiser tip — removing a row whose owner lost their token:** start the server
 with `LEADERBOARD_ADMIN_KEY=<secret> python app.py`, read the row's `id` from
@@ -109,6 +116,8 @@ app.py              Flask server + REST API + TinyDB (atomic JSON storage)
 static/             index.html, guide.html, style.css, app.js, logo.png, favicon.png
 examples/           submission.csv, submission.json (templates)
 submit_readme.md    one-page guide for students (rendered at /guide)
+workshop/           ASSIGNMENT.md (rendered at /assignment); INSTRUCTOR_NOTES.md
+                    is git-ignored and must never be committed, served or deployed
 seed_demo.py        optional: insert a few fake rows for a demo
 deploy/             deploy_pythonanywhere.py — one-shot free hosting (see above)
 vendor/             vendored TinyDB (pure Python, MIT) for hosts without pip

@@ -16,26 +16,30 @@ import uuid
 BASE = sys.argv[1].rstrip("/") if len(sys.argv) > 1 else "http://localhost:8000"
 
 DEMO = [
-    ("Alice Nováková", 0.9412, 0.0211),
-    ("Bob Svoboda", 0.9275, 0.0048),
-    ("Carla Dvořáková", 0.9380, 0.0395),
-    ("David Kučera", 0.9012, 0.0009),
-    ("Eva Horáková", 0.9412, 0.0260),
+    # (name, [(benchmark, accuracy, latency_ms), ...])
+    ("Alice Nováková", [("A", 0.921, 3.2), ("B", 0.958, 6.1)]),
+    ("Bob Svoboda", [("A", 0.895, 0.7), ("B", 0.917, 0.9)]),
+    ("Carla Dvořáková", [("A", 0.934, 48.0), ("B", 0.964, 61.5)]),
+    ("David Kučera", [("A", 0.902, 11.9)]),
+    ("Eva Horáková", [("B", 0.941, 18.4)]),
+    ("Filip Veselý", [("A", 0.874, 0.6), ("B", 0.923, 245.0)]),
 ]
 
 with open("seed_tokens.txt", "a", encoding="utf-8") as log:
-    for name, metric, test in DEMO:
+    for name, results in DEMO:
         token = uuid.uuid4().hex
-        body = json.dumps({"name": name, "metric": metric, "avg_time_s": test}).encode()
+        body = json.dumps([{"name": name, "benchmark": b, "metric": m, "latency_ms": l}
+                           for b, m, l in results]).encode()
         req = urllib.request.Request(
             f"{BASE}/api/submissions/mine", data=body, method="PUT",
             headers={"Content-Type": "application/json", "X-Owner-Token": token},
         )
         try:
             with urllib.request.urlopen(req, timeout=10) as resp:
-                sub = json.loads(resp.read())["submission"]
-                print(f"{resp.status}  {sub['id']}  {name}  token={token}")
-                log.write(f"{token}\t{sub['id']}\t{name}\n")
+                subs = json.loads(resp.read())["submissions"]
+                benches = "+".join(x["benchmark"] for x in subs)
+                print(f"{resp.status}  {benches}  {name}  token={token}")
+                log.write(f"{token}\t{benches}\t{name}\n")
         except urllib.error.HTTPError as e:
             print(f"{e.code}  {name}: {e.read().decode(errors='replace')}")
         except urllib.error.URLError as e:

@@ -1,5 +1,14 @@
-{
-  "name": "Jane Doe",
-  "metric": 0.9312,
-  "avg_time_s": 0.0023
-}
+[
+  {
+    "name": "Jane Doe",
+    "benchmark": "A",
+    "metric": 0.9312,
+    "latency_ms": 1.37
+  },
+  {
+    "name": "Jane Doe",
+    "benchmark": "B",
+    "metric": 0.9698,
+    "latency_ms": 24.35
+  }
+]

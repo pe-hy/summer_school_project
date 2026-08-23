@@ -9,3 +9,5 @@ data/*.lock
 # organiser key written by deploy/deploy_pythonanywhere.py
 deploy/.admin_key
 deploy/.pa_token
+# instructor-only material — NEVER commit or serve (public repo!)
+workshop/INSTRUCTOR_NOTES.md

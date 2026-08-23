@@ -1,60 +1,57 @@
-# Submitting your result to the leaderboard
+# Submitting your results to the leaderboard
 
-Upload **one file** (`.csv` or `.json`) describing **one run** with the
-**Upload submission** button on the leaderboard page. The file is checked in
-your browser before anything is sent — if something is wrong you will see
-exactly what to fix.
+There are **two benchmarks — A and B** (see the [assignment](/assignment)), and each has
+its own ladder. Upload with the **Upload results** button: either **one combined file**
+with both results, or **one file per benchmark** (uploading again only replaces the
+benchmarks contained in the file).
 
-## Required fields
+## Required fields — one row/object per benchmark
 
-| Column         | Type                 | Meaning                                  |
-|----------------|----------------------|------------------------------------------|
-| `name`         | text, max 80 chars   | your name                                |
-| `metric`       | number, 0–1          | your test accuracy (e.g. `0.9312`)       |
-| `avg_time_s`   | number, ≥ 0          | **average** inference time **per test example**, in seconds |
+| Field          | Type                 | Meaning                                          |
+|----------------|----------------------|--------------------------------------------------|
+| `name`         | text, max 80 chars   | your name (identical in both entries)            |
+| `benchmark`    | `"A"` or `"B"`       | which benchmark this result belongs to           |
+| `metric`       | number, 0–1          | top-1 accuracy as a fraction (e.g. `0.9312`)     |
+| `latency_ms`   | number, ≥ 0          | your `L`: mean **milliseconds per example**, the median of your three timed runs |
 
-- All three columns are required, no other columns are allowed, and the file
-  must contain exactly **one** data row.
-- Numbers use a dot as the decimal separator (`0.93`, not `0,93`) and no
-  thousands separators (`1250`, not `1,250`).
-- Column names are case-insensitive; the names shown in the table
-  (`Name`, `Accuracy`, `Avg time (s)`) are accepted too.
+- No other fields are allowed; numbers use a dot as the decimal separator.
+- One file may contain **one or two** results — never two for the same benchmark.
+- Your ladder score is `S = 100 × accuracy − log2(latency_ms)`; halving your latency
+  is worth one accuracy point. The overall standing averages S over both benchmarks
+  (a missing benchmark counts as 0).
 
-## CSV format
+## CSV format (one or two data rows)
 
 ```csv
-name,metric,avg_time_s
-Jane Doe,0.9312,0.0023
+name,benchmark,metric,latency_ms
+Jane Doe,A,0.9312,1.37
+Jane Doe,B,0.9698,24.35
 ```
 
-## JSON format
+## JSON format (one object, or an array with one per benchmark)
 
 ```json
-{
-  "name": "Jane Doe",
-  "metric": 0.9312,
-  "avg_time_s": 0.0023
-}
+[
+  { "name": "Jane Doe", "benchmark": "A", "metric": 0.9312, "latency_ms": 1.37 },
+  { "name": "Jane Doe", "benchmark": "B", "metric": 0.9698, "latency_ms": 24.35 }
+]
 ```
 
-Templates you can copy: [`submission.csv`](examples/submission.csv) · [`submission.json`](examples/submission.json).
+Templates: [`submission.csv`](examples/submission.csv) · [`submission.json`](examples/submission.json).
 
-## Editing or deleting your entry
+## Editing or deleting
 
-Your browser remembers your upload (no account needed). Open the leaderboard in
-the **same browser** and use **Edit / re-upload** to replace your row or
-**Delete** to remove it. If you switch browsers or clear site data, you cannot
-edit the old row yourself — ask an organiser to remove it.
+Your browser remembers your uploads (no account needed). In the **same browser** you can
+re-upload to replace a result, or delete per benchmark / everything. If you switch
+browsers or clear site data, ask an organiser.
 
-Each `name` can appear only once on the leaderboard. If the upload is
-refused with *"A submission for … already exists"*, it was either your own earlier
-upload from another browser or a namesake — in both cases ask an organiser.
+Each `name` can appear only once per benchmark. If your upload is refused with
+*"a submission for … already exists"*, it was either your own earlier upload from
+another browser or a namesake — either way, ask an organiser.
 
 ## Common mistakes
 
-- Extra or misspelt columns (`score` instead of `metric`).
-- More than one data row — submit only your final run.
 - Accuracy as a percentage (`93.12`) — submit the fraction (`0.9312`).
-- Total test-set time instead of the average — divide by the number of test examples.
-- Times in minutes — convert to seconds.
-- Decimal commas from Excel (`0,93`) — use a dot (`0.93`).
+- Latency in **seconds** — submit milliseconds per example (the `L` from `timing.json`).
+- Two rows with the same `benchmark`, or different `name`s in one file.
+- Extra or misspelt fields (`score`, `avg_time_s` are not accepted).

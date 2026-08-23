@@ -20,6 +20,7 @@ import contextlib
 import hashlib
 import hmac
 import json
+import math
 import os
 import stat
 import sys
@@ -49,9 +50,19 @@ ADMIN_KEY = os.environ.get("LEADERBOARD_ADMIN_KEY") or None
 # Submission schema (keep in sync with static/app.js and submit_readme.md)
 # ----------------------------------------------------------------------------
 STRING_FIELDS = ("name",)
-NUMBER_FIELDS = ("metric", "avg_time_s")
-NON_NEGATIVE_FIELDS = ("avg_time_s",)
-FIELDS = STRING_FIELDS + NUMBER_FIELDS
+NUMBER_FIELDS = ("metric", "latency_ms")
+NON_NEGATIVE_FIELDS = ("latency_ms",)
+BENCHMARKS = ("A", "B")
+FIELDS = STRING_FIELDS + ("benchmark",) + NUMBER_FIELDS
+L_REF_MS, LATENCY_FLOOR_MS, LAMBDA = 1.0, 0.01, 1.0
+
+
+def score(doc: dict) -> float | None:
+    """Ladder score S = 100*accuracy - lambda*log2(L/L_ref). Keep in sync with static/app.js scoreOf()."""
+    try:
+        return 100.0 * doc["metric"] - LAMBDA * math.log2(max(doc["latency_ms"], LATENCY_FLOOR_MS) / L_REF_MS)
+    except (KeyError, TypeError, ValueError):
+        return None
 MAX_NAME_LEN = 80
 MAX_ABS_NUMBER = 1e15          # anything bigger is certainly a mistake
 MAX_SUBMISSIONS = 500          # hard cap on rows (the API is unauthenticated)
@@ -131,9 +142,10 @@ def _migrate_legacy_rows() -> None:
     REMOVED (their total-test-time value cannot be converted to a per-example
     average), with a note on stderr so an organiser can ask for a re-upload."""
     for doc in submissions.all():
-        if any(k in doc for k in ("surname", "train_time_s", "test_time_s")) or "avg_time_s" not in doc:
-            print(f"NOTE: removing legacy submission {doc.get('name', '?')!r} — the schema changed to "
-                  "average time per example; ask the owner to re-upload.", file=sys.stderr)
+        if (any(k in doc for k in ("surname", "train_time_s", "test_time_s", "avg_time_s"))
+                or "latency_ms" not in doc or doc.get("benchmark") not in BENCHMARKS):
+            print(f"NOTE: removing legacy submission {doc.get('name', '?')!r} — the schema changed "
+                  "(two benchmarks, latency in ms); ask the owner to re-upload.", file=sys.stderr)
             submissions.remove(doc_ids=[doc.doc_id])
             continue
         person = unicodedata.normalize("NFKC", doc.get("name", "")).casefold()
@@ -180,6 +192,14 @@ def validate_entry(data: object) -> tuple[dict | None, list[str]]:
         errors.append("Unexpected field(s): " + ", ".join(unknown))
 
     clean: dict = {}
+    if "benchmark" not in data:
+        errors.append("Missing field 'benchmark'.")
+    else:
+        bench = normalize_benchmark(data["benchmark"])
+        if bench is None:
+            errors.append('\'benchmark\' must be "A" or "B".')
+        else:
+            clean["benchmark"] = bench
     for field in STRING_FIELDS:
         if field not in data:
             errors.append(f"Missing field '{field}'.")
@@ -223,6 +243,43 @@ def validate_entry(data: object) -> tuple[dict | None, list[str]]:
     return (clean, []) if not errors else (None, errors)
 
 
+def normalize_benchmark(value: object) -> str | None:
+    """'A', 'a', 'benchmark_a', 'Benchmark A', 'project B', ... -> 'A'/'B'; None if unknown."""
+    if not isinstance(value, str):
+        return None
+    key = "".join(c for c in value.casefold() if c.isalnum())
+    for b in BENCHMARKS:
+        low = b.casefold()
+        if key in (low, f"benchmark{low}", f"bench{low}", f"project{low}"):
+            return b
+    return None
+
+
+def validate_submission(data: object) -> tuple[list[dict] | None, list[str]]:
+    """One entry (object), or an array with one result per benchmark (same name)."""
+    if isinstance(data, dict):
+        data = [data]
+    if not isinstance(data, list) or not data:
+        return None, ["Submission must be a JSON object or an array of one or two objects."]
+    if len(data) > len(BENCHMARKS):
+        return None, [f"At most {len(BENCHMARKS)} results (one per benchmark), found {len(data)}."]
+    errors: list[str] = []
+    entries: list[dict] = []
+    for i, item in enumerate(data):
+        label = f"entry {i + 1}: " if len(data) > 1 else ""
+        clean, errs = validate_entry(item)
+        errors.extend(label + e for e in errs)
+        if clean:
+            entries.append(clean)
+    if not errors:
+        benches = [e["benchmark"] for e in entries]
+        if len(set(benches)) != len(benches):
+            errors.append("Both results are for the same benchmark — one must be A and one B.")
+        if len({e["name"].casefold() for e in entries}) > 1:
+            errors.append("Both results must carry the same name.")
+    return (entries, []) if not errors else (None, errors)
+
+
 def person_key(entry: dict) -> str:
     """Case-insensitive identity used to stop the same person appearing twice."""
     return unicodedata.normalize("NFKC", entry["name"]).casefold()
@@ -233,8 +290,11 @@ def public_row(doc: dict, owner_hash: str | None) -> dict:
     return {
         "id": doc.get("id"),
         "name": doc.get("name", ""),
+        "benchmark": doc.get("benchmark"),
         "metric": doc.get("metric"),
-        "avg_time_s": doc.get("avg_time_s"),
+        "latency_ms": doc.get("latency_ms"),
+        "s": score(doc),
+        "person_key": doc.get("person_key"),
         "submitted_at": doc.get("submitted_at", ""),
         "mine": bool(owner_hash) and doc.get("owner_hash") == owner_hash,
     }
@@ -269,48 +329,71 @@ def list_submissions():
 
 @app.put("/api/submissions/mine")
 def upsert_my_submission():
-    """Create the caller's submission, or replace it if one already exists."""
+    """Create or replace the caller's result(s). Body: one entry or an array with
+    one entry per benchmark. Only the benchmarks present in the body are touched."""
     owner_hash = get_owner_hash()
-    clean, errors = validate_entry(api_json_body())
+    entries, errors = validate_submission(api_json_body())
     if errors:
         return jsonify({"error": "Invalid submission.", "details": errors}), 422
 
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
     with db_lock():
-        existing = submissions.get(Submission.owner_hash == owner_hash)
-        # the same person must not appear twice under different tokens
-        same_person = submissions.get(Submission.person_key == person_key(clean))
-        if same_person and (not existing or same_person.doc_id != existing.doc_id):
-            msg = (f"A submission for {same_person['name']} already exists and was uploaded from a "
-                   "different browser. If it is yours, use that browser to replace it, or ask an organiser to remove it.")
-            return jsonify({"error": "Duplicate person.", "details": [msg]}), 409
-        if existing:
-            doc = {**existing, **clean, "person_key": person_key(clean), "submitted_at": now}
-            submissions.update(doc, doc_ids=[existing.doc_id])
-            created = False
-        else:
-            if len(submissions) >= MAX_SUBMISSIONS:
-                return jsonify({"error": "The leaderboard is full.", "details": ["The leaderboard is full — contact an organiser."]}), 507
-            doc = {"id": uuid.uuid4().hex[:12], "owner_hash": owner_hash, **clean,
-                   "person_key": person_key(clean), "submitted_at": now}
-            submissions.insert(doc)
-            created = True
-    return jsonify({"submission": public_row(doc, owner_hash), "created": created}), (201 if created else 200)
+        # conflict pass first, so a two-entry upload is all-or-nothing
+        for entry in entries:
+            mine_other = submissions.get(
+                (Submission.owner_hash == owner_hash) & (Submission.person_key != person_key(entry)))
+            if mine_other:
+                msg = (f"You already have a Benchmark {mine_other.get('benchmark', '?')} result under the name "
+                       f"\"{mine_other.get('name', '?')}\". Use the same name for both benchmarks, or delete "
+                       "the other result first.")
+                return jsonify({"error": "Name mismatch.", "details": [msg]}), 422
+            same_person = submissions.get(
+                (Submission.person_key == person_key(entry)) & (Submission.benchmark == entry["benchmark"]))
+            if same_person and same_person.get("owner_hash") != owner_hash:
+                msg = (f"Benchmark {entry['benchmark']}: a submission for {same_person['name']} already exists and "
+                       "was uploaded from a different browser. If it is yours, use that browser to replace it, "
+                       "or ask an organiser to remove it.")
+                return jsonify({"error": "Duplicate person.", "details": [msg]}), 409
+        if len(submissions) + len(entries) > MAX_SUBMISSIONS + len(BENCHMARKS):
+            return jsonify({"error": "The leaderboard is full.",
+                            "details": ["The leaderboard is full — contact an organiser."]}), 507
+        results = []
+        any_created = False
+        for entry in entries:
+            existing = submissions.get(
+                (Submission.owner_hash == owner_hash) & (Submission.benchmark == entry["benchmark"]))
+            if existing:
+                doc = {**existing, **entry, "person_key": person_key(entry), "submitted_at": now}
+                submissions.update(doc, doc_ids=[existing.doc_id])
+            else:
+                doc = {"id": uuid.uuid4().hex[:12], "owner_hash": owner_hash, **entry,
+                       "person_key": person_key(entry), "submitted_at": now}
+                submissions.insert(doc)
+                any_created = True
+            results.append(public_row(doc, owner_hash))
+    return jsonify({"submissions": results, "created": any_created}), (201 if any_created else 200)
 
 
 @app.get("/api/submissions/mine")
 def get_my_submission():
     owner_hash = get_owner_hash()
     with db_lock():
-        doc = submissions.get(Submission.owner_hash == owner_hash)
-    return jsonify({"submission": public_row(doc, owner_hash) if doc else None})
+        docs = submissions.search(Submission.owner_hash == owner_hash)
+    return jsonify({"submissions": [public_row(d, owner_hash) for d in docs]})
 
 
 @app.delete("/api/submissions/mine")
-def delete_my_submission():
+@app.delete("/api/submissions/mine/<bench>")
+def delete_my_submission(bench: str | None = None):
     owner_hash = get_owner_hash()
+    cond = Submission.owner_hash == owner_hash
+    if bench is not None:
+        normalized = normalize_benchmark(bench)
+        if normalized is None:
+            abort(404, description="Unknown benchmark.")
+        cond = cond & (Submission.benchmark == normalized)
     with db_lock():
-        removed = submissions.remove(Submission.owner_hash == owner_hash)
+        removed = submissions.remove(cond)
     if not removed:
         return jsonify({"error": "You have no submission to delete."}), 404
     return "", 204
@@ -384,6 +467,17 @@ def index():
 @app.get("/guide")
 def guide():
     return _serve_html("guide.html")
+
+
+@app.get("/assignment")
+def assignment():
+    return _serve_html("assignment.html")
+
+
+@app.get("/workshop/ASSIGNMENT.md")
+def assignment_md():
+    # Serve exactly this one file; nothing else in workshop/ is ever exposed.
+    return send_from_directory(BASE_DIR / "workshop", "ASSIGNMENT.md", mimetype="text/markdown")
 
 
 @app.get("/static/<path:filename>")
