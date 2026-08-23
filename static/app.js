@@ -226,7 +226,7 @@
     const rows = parseCSV(text, delimiter);
     if (rows.length === 0) return { errors: ["The file is empty."] };
     if (rows.length < 2) return { errors: ["Missing data rows: the file needs a header line and one or two data lines."] };
-    if (rows.length > 3) return { errors: [`A file holds one result per benchmark — at most two data rows, found ${rows.length - 1}.`] };
+    if (rows.length > 3) return { errors: [`A file holds one result per benchmark, at most two data rows. Found ${rows.length - 1}.`] };
 
     const errors = [];
     const header = rows[0].map((h) => h.trim());
@@ -267,7 +267,7 @@
     catch (e) { return { errors: [`Invalid JSON: ${e.message}`] }; }
     if (!Array.isArray(data)) data = [data];
     if (data.length === 0) return { errors: ["The file is empty."] };
-    if (data.length > 2) return { errors: [`A file holds one result per benchmark — at most two objects, found ${data.length}.`] };
+    if (data.length > 2) return { errors: [`A file holds one result per benchmark, at most two objects. Found ${data.length}.`] };
     const errors = [];
     const entries = [];
     for (const item of data) {
@@ -330,7 +330,7 @@
         continue;
       }
       if (f === "latency_ms" && v < 0) { errors.push("'latency_ms' must be >= 0."); continue; }
-      if (f === "metric" && (v < 0 || v > 1)) { errors.push("'metric' must be between 0 and 1 — accuracy as a fraction (93.12 % is 0.9312)."); continue; }
+      if (f === "metric" && (v < 0 || v > 1)) { errors.push("'metric' must be between 0 and 1, accuracy as a fraction (93.12 % is 0.9312)."); continue; }
       clean[f] = v;
     }
     return { clean: errors.length ? null : clean, errors };
@@ -366,11 +366,11 @@
     if (!errors.length) {
       const benches = clean.map((e) => e.benchmark);
       if (new Set(benches).size !== benches.length) {
-        errors.push("Both results are for the same benchmark — one must be A and one B.");
+        errors.push("Both results are for the same benchmark. One must be A and one B.");
       }
       const names = [...new Set(clean.map((e) => e.name))];
       if (names.length > 1) {
-        errors.push(`Both results must carry the same name — '${names[0]}' and '${names[1]}'.`);
+        errors.push(`Both results must carry the same name, not '${names[0]}' and '${names[1]}'.`);
       }
     }
     return { clean: errors.length ? null : clean, errors, needsBenchChoice };
@@ -542,7 +542,7 @@
     const r = target.getBoundingClientRect();
     const cx = r.left + r.width / 2 - boxRect.left;
     const cy = r.top + r.height / 2 - boxRect.top;
-    P.tip.textContent = `${p.row.name} — ${fmtPct(p.row.metric)}, ${fmtLatency(p.row.latency_ms)} ms/ex`;
+    P.tip.textContent = `${p.row.name}: ${fmtPct(p.row.metric)}, ${fmtLatency(p.row.latency_ms)} ms/ex`;
     P.tip.hidden = false;
     const half = P.tip.offsetWidth / 2;
     P.tip.style.left = `${Math.min(Math.max(cx, half + 2), boxRect.width - half - 2)}px`;
@@ -575,7 +575,7 @@
     const dotClass = (BENCHMARKS.find((b) => b.key === bench) || {}).dotClass || "";
     const svg = svgEl("svg", {
       viewBox: `0 0 ${width} ${height}`, height, role: "group",
-      "aria-label": `Benchmark ${bench}: accuracy versus latency — the same data as the table above.`,
+      "aria-label": `Benchmark ${bench}: accuracy versus latency, the same data as the table above.`,
     });
     svg.style.width = "100%";
     for (const t of L.yTicks) {
@@ -591,7 +591,7 @@
     svg.appendChild(svgEl("line", { x1: L.M.l, x2: L.M.l + L.iw, y1: L.M.t + L.ih, y2: L.M.t + L.ih, class: "plot-axis" }));
     svg.appendChild(svgEl("text", { x: 10, y: 16, class: "plot-axis-title plot-axis-title-y" }, "Test accuracy (%)"));
     svg.appendChild(svgEl("text", { x: L.M.l + L.iw / 2, y: L.height - 8, class: "plot-axis-title" },
-      "Latency (ms per example) — log scale"));
+      "Latency (ms per example, log scale)"));
 
     P.index = new Map();
     for (const p of L.points) {
@@ -743,7 +743,7 @@
     if (!rows.length) {
       const tr = document.createElement("tr");
       tr.className = "placeholder-row";
-      const cell = td(null, `No results on Benchmark ${bench} yet — be the first to upload one.`);
+      const cell = td(null, `No results on Benchmark ${bench} yet. Be the first to upload one.`);
       cell.colSpan = 6;
       tr.appendChild(cell);
       frag.appendChild(tr);
@@ -914,7 +914,7 @@
         } else {
           const txt = document.createElement("span");
           txt.className = "slot-missing";
-          txt.textContent = "no result — counts as 0 ";
+          txt.textContent = "no result, counts as 0 ";
           slot.appendChild(txt);
           const up = document.createElement("button");
           up.type = "button";
@@ -937,7 +937,7 @@
     if (!storageOk) {
       const warn = document.createElement("span");
       warn.className = "storage-warning";
-      warn.textContent = "Your browser blocks site storage: after a reload you will not be able to edit or delete your results.";
+      warn.textContent = "Your browser blocks site storage, so after a reload you will not be able to edit or delete your results.";
       box.appendChild(warn);
     }
   }
@@ -1025,7 +1025,7 @@
       ? (state.mine[scope] ? `Replace your Benchmark ${scope} result` : `Upload your Benchmark ${scope} result`)
       : "Upload results";
     el.dialogNote.textContent = !storageOk
-      ? "Storage is blocked in this browser — you will not be able to edit or delete these results after a reload."
+      ? "Storage is blocked in this browser, so after a reload you will not be able to edit or delete these results."
       : "Your browser remembers this upload so you can replace or delete each result later.";
   }
 
@@ -1067,13 +1067,13 @@
     const warnings = [];
     for (const e of entries) {
       const tag = entries.length > 1 ? `Benchmark ${e.benchmark}: ` : "";
-      if (e.latency_ms > 0 && e.latency_ms < 0.05) warnings.push(`${tag}faster than 20 000 examples/s — did you report seconds instead of milliseconds?`);
-      if (e.metric > 0.999) warnings.push(`${tag}accuracy above 99.9 % — double-check the fraction.`);
+      if (e.latency_ms > 0 && e.latency_ms < 0.05) warnings.push(`${tag}faster than 20 000 examples per second. Did you report seconds instead of milliseconds?`);
+      if (e.metric > 0.999) warnings.push(`${tag}accuracy above 99.9 %. Double-check the fraction.`);
     }
     if (entries.length === 1) {
       const other = BENCH_KEYS.find((b) => b !== entries[0].benchmark);
       if (!state.mine[other]) {
-        warnings.push(`This file covers Benchmark ${entries[0].benchmark} only. Benchmark ${other} still counts as 0 in the overall standing — the assignment asks for both.`);
+        warnings.push(`This file covers Benchmark ${entries[0].benchmark} only. Benchmark ${other} still counts as 0 in the overall standing.`);
       }
     }
     return warnings;
@@ -1103,7 +1103,7 @@
       if (current) {
         const delta = document.createElement("p");
         delta.className = "preview-delta";
-        delta.textContent = `replaces your current Benchmark ${e.benchmark} result — accuracy ${fmtPct(current.metric)} → ${fmtPct(e.metric)}`;
+        delta.textContent = `replaces your current Benchmark ${e.benchmark} result: accuracy ${fmtPct(current.metric)} → ${fmtPct(e.metric)}`;
         wrap.appendChild(delta);
       }
       el.previewEntries.appendChild(wrap);
@@ -1115,7 +1115,7 @@
     const { clean, errors, needsBenchChoice } = parseSubmissionFile(fileName, text, injectBench);
     if (needsBenchChoice && !injectBench && !state.uploadScope) {
       el.benchChooser.hidden = false;
-      showValidation(["The file does not say which benchmark it is — pick one below."]);
+      showValidation(["The file does not say which benchmark it is. Pick one below."]);
       return;
     }
     el.benchChooser.hidden = true;
@@ -1124,13 +1124,13 @@
     if (state.uploadScope) {
       const benches = clean.map((e) => e.benchmark);
       if (!benches.includes(state.uploadScope)) {
-        showValidation([`This file is Benchmark ${benches.join(" and ")}, but you opened it from the Benchmark ${state.uploadScope} card. Fix the file, or upload it from the Benchmark ${benches[0]} card.`]);
+        showValidation([`This file is Benchmark ${benches.join(" and ")}, but you opened it from the Benchmark ${state.uploadScope} card. Fix the file or upload it from the Benchmark ${benches[0]} card.`]);
         showWarnings([]);
         return;
       }
     }
     state.pending = clean;
-    showValidation([], { okMessage: "Looks good — review the parsed results below and press Submit." });
+    showValidation([], { okMessage: "Looks good. Review the parsed results below and press Submit." });
     showWarnings(collectWarnings(clean));
     showPreview(clean);
     el.btnSubmitUpload.disabled = false;
@@ -1148,12 +1148,12 @@
     el.btnSubmitUpload.textContent = "Submit";
     if (!file) {
       el.dropzoneFile.textContent = "";
-      showValidation(["No file received — drop a single .csv or .json file."]);
+      showValidation(["No file received. Drop a single .csv or .json file."]);
       return;
     }
     el.dropzoneFile.textContent = `${file.name} (${file.size.toLocaleString()} bytes)`;
     if (file.size > CONFIG.MAX_FILE_BYTES) {
-      showValidation([`File is too large (${file.size.toLocaleString()} bytes). Results are a couple of rows — well under 1 KB.`]);
+      showValidation([`File is too large (${file.size.toLocaleString()} bytes). Results are a couple of rows, well under 1 KB.`]);
       return;
     }
     let text;

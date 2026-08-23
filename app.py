@@ -147,7 +147,7 @@ def _migrate_legacy_rows() -> None:
     for doc in submissions.all():
         if (any(k in doc for k in ("surname", "train_time_s", "test_time_s", "avg_time_s"))
                 or "latency_ms" not in doc or doc.get("benchmark") not in BENCHMARKS):
-            print(f"NOTE: removing legacy submission {doc.get('name', '?')!r} — the schema changed "
+            print(f"NOTE: removing legacy submission {doc.get('name', '?')!r}: the schema changed "
                   "(two benchmarks, latency in ms); ask the owner to re-upload.", file=sys.stderr)
             submissions.remove(doc_ids=[doc.doc_id])
             continue
@@ -242,7 +242,7 @@ def validate_entry(data: object) -> tuple[dict | None, list[str]]:
             errors.append(f"'{field}' must be >= 0.")
             continue
         if field == "metric" and not 0 <= number <= 1:
-            errors.append("'metric' must be between 0 and 1 — accuracy as a fraction (93.12 % is 0.9312).")
+            errors.append("'metric' must be between 0 and 1, accuracy as a fraction (93.12 % is 0.9312).")
             continue
         clean[field] = number
 
@@ -280,7 +280,7 @@ def validate_submission(data: object) -> tuple[list[dict] | None, list[str]]:
     if not errors:
         benches = [e["benchmark"] for e in entries]
         if len(set(benches)) != len(benches):
-            errors.append("Both results are for the same benchmark — one must be A and one B.")
+            errors.append("Both results are for the same benchmark. One must be A and one B.")
         if len({person_key(e) for e in entries}) > 1:
             errors.append("Both results must carry the same name.")
     return (entries, []) if not errors else (None, errors)
@@ -370,7 +370,7 @@ def upsert_my_submission():
             (Submission.owner_hash == owner_hash) & (Submission.benchmark == e["benchmark"]))]
         if len(submissions) + len(inserts) > MAX_SUBMISSIONS:
             return jsonify({"error": "The leaderboard is full.",
-                            "details": ["The leaderboard is full — contact an organiser."]}), 507
+                            "details": ["The leaderboard is full. Contact an organiser."]}), 507
         results = []
         any_created = False
         for entry in entries:

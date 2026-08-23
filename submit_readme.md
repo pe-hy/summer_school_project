@@ -1,11 +1,11 @@
 # Submitting your results to the leaderboard
 
-There are **two benchmarks — A and B** (see the [assignment](/assignment)), and each has
-its own ladder. Upload with the **Upload results** button: either **one combined file**
-with both results, or **one file per benchmark** (uploading again only replaces the
-benchmarks contained in the file).
+There are two benchmarks, A and B, each with its own ladder (see the
+[assignment](/assignment)). Upload with the **Upload results** button: either one
+combined file with both results, or one file per benchmark. Uploading again only
+replaces the benchmarks contained in the file.
 
-## Required fields — one row/object per benchmark
+## Required fields, one row/object per benchmark
 
 | Field          | Type                 | Meaning                                          |
 |----------------|----------------------|--------------------------------------------------|
@@ -15,7 +15,7 @@ benchmarks contained in the file).
 | `latency_ms`   | number, ≥ 0          | mean **milliseconds per example** on the test set (Colab T4) |
 
 - No other fields are allowed; numbers use a dot as the decimal separator.
-- One file may contain **one or two** results — never two for the same benchmark.
+- One file may contain one or two results, never two for the same benchmark.
 - Ladders rank by accuracy. The overall standing is the average of your two
   accuracies (a missing benchmark counts as 0).
 
@@ -46,11 +46,11 @@ browsers or clear site data, ask an organiser.
 
 Each `name` can appear only once per benchmark. If your upload is refused with
 *"a submission for … already exists"*, it was either your own earlier upload from
-another browser or a namesake — either way, ask an organiser.
+another browser or a namesake. Either way, ask an organiser.
 
 ## Common mistakes
 
-- Accuracy as a percentage (`93.12`) — submit the fraction (`0.9312`).
-- Latency in **seconds** — submit milliseconds per example (the `L` from `timing.json`).
+- Accuracy as a percentage (`93.12`): submit the fraction (`0.9312`).
+- Latency in seconds: submit milliseconds per example.
 - Two rows with the same `benchmark`, or different `name`s in one file.
 - Extra or misspelt fields (`score`, `avg_time_s` are not accepted).

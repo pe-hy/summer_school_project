@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Ostr-AI 2026 · Leaderboard</title>
-  <meta name="description" content="Leaderboard of the Efficient Intent Classification Challenge — Ostr-AI AI Summer School 2026">
+  <meta name="description" content="Leaderboard for Fast and Accurate Text Classification, Ostr-AI AI Summer School 2026">
   <link rel="icon" type="image/png" href="/static/favicon.png?v=__V__">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -31,11 +31,11 @@
 
   <main class="container">
     <section class="intro">
-      <p>Fast &amp; Accurate Text Classification — two benchmarks, each with its own ladder,
-        ranked by accuracy. The overall standing is the average of your two accuracies
-        (a skipped benchmark counts as 0).</p>
-      <p>Time your runs in Google Colab so the numbers are comparable.
-        <a href="/assignment">Read the assignment →</a></p>
+      <p>Fast and Accurate Text Classification: two benchmarks, each with its own ladder,
+        ranked by accuracy. The overall standing is the average of your two accuracies.
+        A skipped benchmark counts as 0.</p>
+      <p>Everything is timed on a Colab T4, so the numbers are comparable.
+        <a href="/assignment">Read the assignment</a></p>
     </section>
 
     <section class="status-bar">
@@ -74,10 +74,10 @@
                   <button type="button" class="sort-btn"><span>Name</span><span class="sort-icon" aria-hidden="true"></span></button>
                 </th>
                 <th scope="col" class="num" data-key="accA" aria-sort="none">
-                  <button type="button" class="sort-btn"><span>Accuracy — A</span><span class="sort-icon" aria-hidden="true"></span></button>
+                  <button type="button" class="sort-btn"><span>Accuracy A</span><span class="sort-icon" aria-hidden="true"></span></button>
                 </th>
                 <th scope="col" class="num" data-key="accB" aria-sort="none">
-                  <button type="button" class="sort-btn"><span>Accuracy — B</span><span class="sort-icon" aria-hidden="true"></span></button>
+                  <button type="button" class="sort-btn"><span>Accuracy B</span><span class="sort-icon" aria-hidden="true"></span></button>
                 </th>
                 <th scope="col" class="num" data-key="accFinal" aria-sort="none">
                   <button type="button" class="sort-btn"><span>Average</span><span class="sort-icon" aria-hidden="true"></span></button>
@@ -154,7 +154,7 @@
       <div class="plot-head">
         <div>
           <h3 class="plot-title">Accuracy vs. latency</h3>
-          <p class="plot-sub">Every dot is one result — up and to the left is better.
+          <p class="plot-sub">Every dot is one result and top left is best.
             Tick the boxes in the table to put names on the plots, or hover a dot.</p>
         </div>
         <button type="button" class="btn btn-ghost btn-sm btn-label-all" disabled>Show all names</button>
@@ -176,7 +176,7 @@
       </header>
 
       <p class="dialog-hint">
-        A <code>.csv</code> or <code>.json</code> file with one row per benchmark — both at once,
+        A <code>.csv</code> or <code>.json</code> file with one row per benchmark, both at once
         or one at a time. Columns: <code>name, benchmark, metric, latency_ms</code>
         (accuracy 0–1; latency in <strong>milliseconds per example</strong>).
         Templates: <a href="/examples/submission.csv">CSV</a> · <a href="/examples/submission.json">JSON</a>
