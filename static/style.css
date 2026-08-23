@@ -328,6 +328,7 @@ tr.mine td.name-cell { font-weight: 600; }
   border-radius: 0 8px 8px 0;
 }
 .guide blockquote p { margin: .2rem 0; }
+.guide .md-btn { margin: 1.4rem 0 .4rem; }
 .guide hr { border: 0; border-top: 1px solid var(--line-strong); margin: 1.6rem 0; }
 .guide ol { padding-left: 1.4rem; }
 .guide ol li { margin: .25rem 0; }

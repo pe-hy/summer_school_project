@@ -90,7 +90,10 @@
                !/^(#{1,3}\s|```|\||\s*[-*]\s+|\s*\d+\.\s+|>|-{3,}\s*$)/.test(lines[i])) {
           buf.push(lines[i++]);
         }
-        out.push(`<p>${inline(buf.join(" "))}</p>`);
+        const joined = buf.join(" ").trim();
+        const lone = joined.match(/^\[([^\]]+)\]\(([^)\s]+)\)$/);
+        if (lone) out.push(`<p class="md-btn"><a class="btn btn-primary" href="${esc(lone[2])}">${esc(lone[1])}</a></p>`);
+        else out.push(`<p>${inline(joined)}</p>`);
       }
     }
     return out.join("\n");

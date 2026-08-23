@@ -14,8 +14,7 @@ category `lost_card`.)
 | Structure | one topic area | ten topic areas |
 | Training pool | 10,003 messages | 18,000 messages |
 
-Build for both. They look similar but do not behave the same — what works on one
-may disappoint you on the other, and that is part of the fun.
+Build for both — they look similar but do not behave the same.
 
 ## What you get
 
@@ -48,22 +47,14 @@ Two numbers per benchmark, measured by you, on the test set:
 - **Accuracy** — the fraction of test messages your system gets right (0–1).
 - **Average time per example** — milliseconds per message. Load your model first,
   then time the classification of the test messages one at a time and divide by
-  their count. **Run the timing in Google Colab**, so everyone's numbers are
-  comparable.
-
-Fast and accurate both matter: the plots on the leaderboard show exactly this
-trade-off, and it is what the 1-on-1 discussions will be about.
+  their count. Everything runs on a **Colab T4**, so the numbers are comparable.
 
 ## The leaderboard
 
-Upload **one small file** with your name and your numbers at
-**[pehy.pythonanywhere.com](https://pehy.pythonanywhere.com)** — CSV or JSON,
-one row per benchmark, templates and a guide are on the site. Re-upload any time
-to update; you can submit the two benchmarks separately or together.
+One file — CSV or JSON, one row per benchmark, templates and a guide on the site.
+Re-upload to update; the benchmarks can be submitted separately or together.
 
-Ladders rank by accuracy (ties go to the faster system). The overall standing is
-the **average of your two accuracies** — a benchmark you skip counts as 0, so do
-both.
+Ladders rank by accuracy. The overall standing is the average of your two
+accuracies; a skipped benchmark counts as 0.
 
-Results are self-reported. At the end of the workshop you'll walk through your
-system in a short 1-on-1 — be ready to show how it works.
+[Open the leaderboard](/)
