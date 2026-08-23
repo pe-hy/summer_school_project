@@ -22,8 +22,10 @@ import hmac
 import json
 import math
 import os
+import shutil
 import stat
 import sys
+import tempfile
 import threading
 import unicodedata
 import uuid
@@ -101,14 +103,20 @@ class AtomicJSONStorage(Storage):
         return data
 
     def write(self, data):
-        tmp = self.path.with_name(self.path.name + ".tmp")
-        with open(tmp, "w", encoding="utf-8") as fh:
-            json.dump(data, fh, **self.json_kwargs)
-            fh.flush()
-            os.fsync(fh.fileno())
-        if self.path.exists():  # keep whatever permissions the organiser set on the db file
-            os.chmod(tmp, stat.S_IMODE(self.path.stat().st_mode))
-        os.replace(tmp, self.path)
+        # unique temp name: concurrent workers can never interleave inside one file
+        fd, tmp = tempfile.mkstemp(dir=self.path.parent, prefix=self.path.name + ".", suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                json.dump(data, fh, **self.json_kwargs)
+                fh.flush()
+                os.fsync(fh.fileno())
+            if self.path.exists():  # keep whatever permissions the organiser set on the db file
+                os.chmod(tmp, stat.S_IMODE(self.path.stat().st_mode))
+            os.replace(tmp, self.path)
+        except BaseException:
+            with contextlib.suppress(OSError):
+                os.unlink(tmp)
+            raise
         try:  # make the rename itself durable
             dir_fd = os.open(self.path.parent, os.O_RDONLY)
             try:
@@ -127,7 +135,6 @@ app.config["MAX_CONTENT_LENGTH"] = 64 * 1024  # 64 KB is plenty for one row
 app.json.sort_keys = False
 app.json.ensure_ascii = False
 
-DB_PATH.with_name(DB_PATH.name + ".tmp").unlink(missing_ok=True)  # leftover from a crash mid-write
 db = TinyDB(DB_PATH, storage=AtomicJSONStorage, indent=2, ensure_ascii=False)
 submissions = db.table("submissions")
 try:
@@ -138,9 +145,15 @@ Submission = Query()
 
 
 def _migrate_legacy_rows() -> None:
-    """Startup schema upkeep. Rows from before the avg-time-per-example schema are
-    REMOVED (their total-test-time value cannot be converted to a per-example
-    average), with a note on stderr so an organiser can ask for a re-upload."""
+    """Startup schema upkeep. Rows from an older schema are REMOVED (their values
+    cannot be converted), with a stderr note — but only after the pre-migration
+    file has been copied to a .bak next to it, so nothing is lost irreversibly."""
+    legacy = [doc for doc in submissions.all()
+              if any(k in doc for k in ("surname", "train_time_s", "test_time_s", "avg_time_s"))
+              or "latency_ms" not in doc or doc.get("benchmark") not in BENCHMARKS]
+    if legacy and DB_PATH.exists():
+        with contextlib.suppress(OSError):
+            shutil.copy2(DB_PATH, DB_PATH.with_name(DB_PATH.name + ".pre-migration.bak"))
     for doc in submissions.all():
         if (any(k in doc for k in ("surname", "train_time_s", "test_time_s", "avg_time_s"))
                 or "latency_ms" not in doc or doc.get("benchmark") not in BENCHMARKS):
@@ -153,7 +166,6 @@ def _migrate_legacy_rows() -> None:
             submissions.update({"person_key": person}, doc_ids=[doc.doc_id])
 
 
-_migrate_legacy_rows()
 _thread_lock = threading.Lock()   # TinyDB is not thread-safe; Flask's dev server is threaded
 _LOCK_PATH = DB_PATH.with_name(DB_PATH.name + ".lock")
 
@@ -176,6 +188,10 @@ def db_lock():
             finally:
                 if locked:
                     fcntl.flock(lock_fh, fcntl.LOCK_UN)
+
+
+with db_lock():
+    _migrate_legacy_rows()
 
 
 # ----------------------------------------------------------------------------
@@ -275,7 +291,7 @@ def validate_submission(data: object) -> tuple[list[dict] | None, list[str]]:
         benches = [e["benchmark"] for e in entries]
         if len(set(benches)) != len(benches):
             errors.append("Both results are for the same benchmark — one must be A and one B.")
-        if len({e["name"].casefold() for e in entries}) > 1:
+        if len({person_key(e) for e in entries}) > 1:
             errors.append("Both results must carry the same name.")
     return (entries, []) if not errors else (None, errors)
 
@@ -339,22 +355,31 @@ def upsert_my_submission():
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
     with db_lock():
         # conflict pass first, so a two-entry upload is all-or-nothing
+        req_benches = [e["benchmark"] for e in entries]
         for entry in entries:
+            pk = person_key(entry)
+            # a name on the board belongs to exactly one browser token, on every benchmark
+            other_owner = submissions.get(
+                (Submission.person_key == pk) & (Submission.owner_hash != owner_hash))
+            if other_owner:
+                msg = (f"A submission under the name {other_owner.get('name', '?')} already exists and was "
+                       "uploaded from a different browser. If it is yours, upload from that browser, or ask "
+                       "an organiser to remove it.")
+                return jsonify({"error": "Duplicate person.", "details": [msg]}), 409
+            # one token, one name — but rows this request replaces don't pin the old name,
+            # so a student can fix a typo by re-uploading the affected benchmark(s)
             mine_other = submissions.get(
-                (Submission.owner_hash == owner_hash) & (Submission.person_key != person_key(entry)))
+                (Submission.owner_hash == owner_hash) & (Submission.person_key != pk)
+                & (~Submission.benchmark.one_of(req_benches)))
             if mine_other:
                 msg = (f"You already have a Benchmark {mine_other.get('benchmark', '?')} result under the name "
-                       f"\"{mine_other.get('name', '?')}\". Use the same name for both benchmarks, or delete "
-                       "the other result first.")
+                       f"\"{mine_other.get('name', '?')}\". Use the same name for both benchmarks, or re-upload "
+                       "both results in one file to rename.")
                 return jsonify({"error": "Name mismatch.", "details": [msg]}), 422
-            same_person = submissions.get(
-                (Submission.person_key == person_key(entry)) & (Submission.benchmark == entry["benchmark"]))
-            if same_person and same_person.get("owner_hash") != owner_hash:
-                msg = (f"Benchmark {entry['benchmark']}: a submission for {same_person['name']} already exists and "
-                       "was uploaded from a different browser. If it is yours, use that browser to replace it, "
-                       "or ask an organiser to remove it.")
-                return jsonify({"error": "Duplicate person.", "details": [msg]}), 409
-        if len(submissions) + len(entries) > MAX_SUBMISSIONS + len(BENCHMARKS):
+        # only genuinely new rows count against the cap — replacing is always allowed
+        inserts = [e for e in entries if not submissions.get(
+            (Submission.owner_hash == owner_hash) & (Submission.benchmark == e["benchmark"]))]
+        if len(submissions) + len(inserts) > MAX_SUBMISSIONS:
             return jsonify({"error": "The leaderboard is full.",
                             "details": ["The leaderboard is full — contact an organiser."]}), 507
         results = []
@@ -419,7 +444,7 @@ def cache_headers(response):
         response.headers["Vary"] = "X-Owner-Token"
     elif request.path.startswith("/static/"):
         # URLs carry a content-hash ?v=..., so long caching is safe
-        response.headers.setdefault("Cache-Control", "public, max-age=86400")
+        response.headers["Cache-Control"] = "public, max-age=86400"
     return response
 
 

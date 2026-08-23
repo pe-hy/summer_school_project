@@ -507,6 +507,7 @@
         s: +S.toPrecision(12),
         x1: xPosU(ua), y1: yPos(ya),
         x2: xPosU(ub), y2: yPos(yb),
+        atRight: ub >= u1 - 1e-9,
       });
     }
 
@@ -533,11 +534,11 @@
       default:   return { x: p.x - 7, y: p.y + 15, a: "end",    bx0: p.x - 7 - w, bx1: p.x - 7 };
     }
   }
-  function placeLabels(points, widthOf, M, iw, ih) {
+  function placeLabels(points, widthOf, M, iw, ih, allPoints) {
     const ASC = 9, DESC = 3, DOT = 7, PAD = 2;
     const bx0 = M.l + 1, bx1 = M.l + iw - 1, by0 = M.t + 1, by1 = M.t + ih - 1;
     const boxes = [];
-    const dots = points.map((d) => [d.x - DOT, d.x + DOT, d.y - DOT, d.y + DOT]);
+    const dots = (allPoints || points).map((d) => [d.x - DOT, d.x + DOT, d.y - DOT, d.y + DOT]);
     const hitsBox = (b, o) => b[0] < o[1] && o[0] < b[1] && b[2] < o[3] && o[2] < b[3];
     for (const p of [...points].sort((a, b) => a.y - b.y || a.x - b.x)) {
       const w = widthOf(p);
@@ -600,8 +601,7 @@
     P.empty.hidden = true;
     const width = Math.max(320, P.host.clientWidth || 640);
     const key = width + "|" + rows.map((r) => `${r.id},${r.name},${r.metric},${r.latency_ms},${r.mine ? 1 : 0}`).join(";");
-    if (key === P.lastKey) { syncNameVisibility(); return; }
-    if (P.host.contains(document.activeElement)) return;   // keyboard user inside: retry next poll
+    if (key === P.lastKey) { relayoutNames(bench); return; }
     P.lastKey = key;
     hidePlotTip(bench);
 
@@ -625,7 +625,9 @@
     }
     for (const line of L.iso) {
       svg.appendChild(svgEl("line", { x1: line.x1, y1: line.y1, x2: line.x2, y2: line.y2, class: "plot-iso" }));
-      svg.appendChild(svgEl("text", { x: line.x2 + 5, y: line.y2 + 3.5, class: "plot-iso-label" }, `S ${line.s}`));
+      if (line.atRight) {   // labels live in the right margin; top-clipped lines stay unlabeled
+        svg.appendChild(svgEl("text", { x: line.x2 + 5, y: line.y2 + 3.5, class: "plot-iso-label" }, `S ${line.s}`));
+      }
     }
     svg.appendChild(svgEl("line", { x1: L.M.l, x2: L.M.l + L.iw, y1: L.M.t + L.ih, y2: L.M.t + L.ih, class: "plot-axis" }));
     svg.appendChild(svgEl("text", { x: 10, y: 16, class: "plot-axis-title plot-axis-title-y" }, "Test accuracy (%)"));
@@ -638,58 +640,64 @@
       const dot = svgEl("circle", { cx: p.x, cy: p.y, r: 5, class: `plot-dot ${dotClass}` + (mine ? " mine" : "") });
       svg.appendChild(dot);
       const hit = svgEl("circle", {
-        cx: p.x, cy: p.y, r: 12, class: "plot-hit", tabindex: "0",
-        "aria-label": `${p.row.name}: score ${fmtScore(p.row.s)}, ${fmtPct(p.row.metric)}, ${fmtLatency(p.row.latency_ms)} milliseconds per example`,
+        cx: p.x, cy: p.y, r: 12, class: "plot-hit", "aria-hidden": "true",
       });
       const over = () => { dot.classList.add("hot"); showPlotTip(bench, p, hit); };
       const out = () => { dot.classList.remove("hot"); hidePlotTip(bench); };
       hit.addEventListener("pointerenter", over);
       hit.addEventListener("pointerleave", out);
-      hit.addEventListener("focus", over);
-      hit.addEventListener("blur", out);
       svg.appendChild(hit);
       P.index.set(p.row.person_key, { p, dot });
     }
-    // precomputed name labels for every point; checkboxes only toggle visibility
+    // Name label nodes for every point (hidden). Placement runs over the CHECKED
+    // subset only — with every dot as an obstacle — so a ticked name is shown
+    // whenever it can physically fit, however dense the rest of the board is.
     const estWidth = (p) => 10 + (p.row.name.length + (p.row.mine ? 6 : 0)) * 7;
-    placeLabels(L.points, estWidth, L.M, L.iw, L.ih);
-    const applyLabelGeom = (p, node) => {
-      if (!p.labelPos) { node.style.display = "none"; return; }
-      node.style.display = "";
-      node.setAttribute("x", p.labelPos.x);
-      node.setAttribute("y", p.labelPos.y);
-      node.setAttribute("text-anchor", p.labelPos.a);
-    };
-    const labelNodes = new Map();
+    P.labelData = [];
     for (const p of L.points) {
       const node = svgEl("text", { class: "plot-name" + (p.row.mine ? " mine" : "") },
         p.row.name + (p.row.mine ? " (you)" : ""));
-      node.style.visibility = "hidden";
-      labelNodes.set(p, node);
+      node.style.display = "none";
       svg.appendChild(node);
-      applyLabelGeom(p, node);
+      P.labelData.push({ pk: p.row.person_key, p, node });
       const entry = P.index.get(p.row.person_key);
       if (entry) entry.label = node;
     }
+    P.layout = { M: L.M, iw: L.iw, ih: L.ih };
+    P.allPoints = L.points;
+    P.widths = new Map();
     P.host.replaceChildren(svg);
-    try {   // re-place with real text widths (visibility:hidden still measures)
-      const measured = new Map();
-      for (const [p, node] of labelNodes) {
-        const w = node.getComputedTextLength();
-        measured.set(p, w > 0 ? w + 6 : estWidth(p));
+    try {   // measure real text widths once (display:none defeats measurement, so flip briefly)
+      for (const d of P.labelData) {
+        d.node.style.visibility = "hidden";
+        d.node.style.display = "";
+        const w = d.node.getComputedTextLength();
+        P.widths.set(d.p, w > 0 ? w + 6 : estWidth(d.p));
+        d.node.style.display = "none";
+        d.node.style.visibility = "";
       }
-      placeLabels(L.points, (p) => measured.get(p), L.M, L.iw, L.ih);
-      for (const [p, node] of labelNodes) applyLabelGeom(p, node);
-    } catch (_) { /* estimated layout stands */ }
-    syncNameVisibility();
+    } catch (_) {
+      for (const d of P.labelData) P.widths.set(d.p, estWidth(d.p));
+    }
+    relayoutNames(bench);
   }
 
-  function syncNameVisibility() {
+  function relayoutNames(onlyBench) {
     for (const bench of BENCH_KEYS) {
+      if (onlyBench && bench !== onlyBench) continue;
       const P = plots[bench];
-      if (!P || !P.index) continue;
-      for (const [pk, entry] of P.index) {
-        if (entry.label) entry.label.style.visibility = state.labeled.has(pk) ? "visible" : "hidden";
+      if (!P || !P.labelData || !P.layout) continue;
+      const subset = P.labelData.filter((d) => state.labeled.has(d.pk));
+      placeLabels(subset.map((d) => d.p), (p) => P.widths.get(p) || 80,
+        P.layout.M, P.layout.iw, P.layout.ih, P.allPoints);
+      for (const d of P.labelData) {
+        const show = state.labeled.has(d.pk) && d.p.labelPos;
+        d.node.style.display = show ? "" : "none";
+        if (show) {
+          d.node.setAttribute("x", d.p.labelPos.x);
+          d.node.setAttribute("y", d.p.labelPos.y);
+          d.node.setAttribute("text-anchor", d.p.labelPos.a);
+        }
       }
     }
   }
@@ -765,6 +773,7 @@
   function renderLadderTable(bench) {
     const view = state.views[bench];
     const dom = ladders[bench];
+    if (dom.tbody.contains(document.activeElement)) return;   // keyboard user inside: retry next poll
     const rows = sortView(state.ladders[bench], view);
     const key = `${view.sortKey}|${view.sortDir}|` +
       rows.map((r) => `${r.id},${r.name},${r.s},${r.metric},${r.latency_ms},${r.rank},${r.mine ? 1 : 0},${r.submitted_at}`).join(";");
@@ -821,6 +830,7 @@
 
   function renderOverallTable() {
     const view = state.views.overall;
+    if (el.overallBody.contains(document.activeElement)) return;
     const rows = sortView(state.overall, view);
     const key = `${view.sortKey}|${view.sortDir}|` +
       rows.map((r) => `${r.pk},${r.name},${r.sA},${r.sB},${r.sFinal},${r.rank},${r.mine ? 1 : 0}`).join(";");
@@ -878,7 +888,7 @@
     for (const bench of BENCH_KEYS) {
       const btn = ladders[bench] && ladders[bench].btnLabelAll;
       if (!btn) continue;
-      btn.disabled = total === 0;
+      btn.disabled = state.ladders[bench].length === 0;
       btn.textContent = all ? "Hide names" : "Show all names";
     }
   }
@@ -896,7 +906,7 @@
     if (on) state.labeled.add(pk); else state.labeled.delete(pk);
     updateLabelAllButtons();
     syncCheckboxes();
-    syncNameVisibility();
+    relayoutNames();
   }
 
   // ---------------------------------------------------------------------------
@@ -907,6 +917,7 @@
   }
 
   function renderMyStatus() {
+    if (el.myStatus.contains(document.activeElement)) return;
     const mA = state.mine.A, mB = state.mine.B;
     const ov = myOverall();
     const key = [mA && `${mA.id},${mA.s},${mA.rank}`, mB && `${mB.id},${mB.s},${mB.rank}`,
@@ -1303,7 +1314,7 @@
         else for (const pk of total) state.labeled.add(pk);
         updateLabelAllButtons();
         syncCheckboxes();
-        syncNameVisibility();
+        relayoutNames();
       });
       dom.tbody.addEventListener("mouseover", (e) => {
         const tr = e.target.closest("tr[data-pk]");

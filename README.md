@@ -17,12 +17,14 @@ ladders update live and rank by `S = 100 × accuracy − log₂(latency in ms)`.
   iso-score diagonals make the trade-off visible.
 - **Assignment on the site** — `/assignment` renders `workshop/ASSIGNMENT.md`
   (instructor notes are git-ignored and never served or deployed).
-- **Upload / edit / delete** — the file is parsed and validated **in the browser**
-  (required columns, numeric types, exactly one row, friendly error messages) and
-  shown as a preview before it is sent. The server re-validates defensively.
+- **Upload / edit / delete** — a file holds one result per benchmark (one or two
+  rows), parsed and validated **in the browser** with a preview that shows the
+  computed S before submitting. The server re-validates defensively; replacing
+  and deleting work per benchmark.
 - **No accounts** — each browser gets a random owner token in `localStorage`; a
-  token owns at most one row and only its holder can replace or delete it.
-  The database stores only a SHA-256 hash of the token.
+  token owns at most one row **per benchmark** (same name on both) and only its
+  holder can replace or delete them. The database stores only a SHA-256 hash of
+  the token.
 - **NoSQL storage** — submissions are documents in [TinyDB](https://tinydb.readthedocs.io/)
   (`data/leaderboard.json`, written atomically). No database server needed.
 - **Live updates** — the table refreshes itself every 10 s.

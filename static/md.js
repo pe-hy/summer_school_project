@@ -45,19 +45,42 @@
           head.map((c) => `<th>${inline(c)}</th>`).join("") + "</tr></thead><tbody>" +
           body.map((r) => "<tr>" + r.map((c) => `<td>${inline(c)}</td>`).join("") + "</tr>").join("") +
           "</tbody></table></div>");
-      } else if (/^\s*\d+\.\s+/.test(line) || /^\s*[-*]\s+/.test(line)) {   // lists
+      } else if (/^\s*\d+\.\s+/.test(line) || /^\s*[-*]\s+/.test(line)) {   // lists (one nesting level)
         const ordered = /^\s*\d+\.\s+/.test(line);
-        const marker = ordered ? /^\s*\d+\.\s+/ : /^\s*[-*]\s+/;
+        const anyMarker = /^(\s*)(\d+\.|[-*])\s+/;
+        const baseIndent = (line.match(/^\s*/) || [""])[0].length;
         const items = [];
-        while (i < lines.length && marker.test(lines[i])) {
-          let item = lines[i++].replace(marker, "");
-          while (i < lines.length && /^\s{2,}\S/.test(lines[i]) &&
-                 !/^\s*\d+\.\s+/.test(lines[i]) && !/^\s*[-*]\s+/.test(lines[i])) {
-            item += " " + lines[i++].trim();
+        while (i < lines.length) {
+          const cur = lines[i];
+          const m = cur.match(anyMarker);
+          if (m) {
+            const indent = m[1].length;
+            if (indent > baseIndent && items.length) {
+              // nested block: collect everything more indented than the outer list
+              const subIndent = indent;
+              const sub = [];
+              while (i < lines.length && lines[i].trim() !== "" &&
+                     ((lines[i].match(/^\s*/) || [""])[0].length > baseIndent)) {
+                sub.push(lines[i].slice(Math.min(subIndent, (lines[i].match(/^\s*/) || [""])[0].length)));
+                i++;
+              }
+              items[items.length - 1].sub = (items[items.length - 1].sub || "") + renderMarkdown(sub.join("\n"));
+              continue;
+            }
+            if (indent < baseIndent) break;
+            items.push({ text: cur.replace(anyMarker, "") });
+            i++;
+            continue;
           }
-          items.push(`<li>${inline(item)}</li>`);
+          if (/^\s{2,}\S/.test(cur) && items.length) {   // continuation line
+            items[items.length - 1].text += " " + cur.trim();
+            i++;
+            continue;
+          }
+          break;
         }
-        out.push(ordered ? `<ol>${items.join("")}</ol>` : `<ul>${items.join("")}</ul>`);
+        const lis = items.map((it) => `<li>${inline(it.text)}${it.sub || ""}</li>`).join("");
+        out.push(ordered ? `<ol>${lis}</ol>` : `<ul>${lis}</ul>`);
       } else if (line.trim() === "") {
         i++;
       } else {                                                   // paragraph

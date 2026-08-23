@@ -420,6 +420,7 @@ td.num.missing { color: var(--line-strong); }
 
 /* ---------- upload dialog additions ---------- */
 .validation.warn { background: var(--amber-tint); border-color: #f3d89a; color: var(--amber-ink); }
+.bench-chooser[hidden] { display: none; }
 .bench-chooser {
   border: 1px solid var(--line-strong);
   border-radius: 8px;
