@@ -1,8 +1,7 @@
 /* Ostr-AI 2026 leaderboard — front-end logic (no dependencies).
  *
- * Two benchmark ladders (A, B) + an overall standing, per the Efficient Intent
- * Classification Challenge. Rows come from /api/submissions; a row's ladder
- * score S = 100*accuracy - log2(average_time_per_example) is computed by the server.
+ * Two benchmark ladders (A, B) + an overall standing. Rows come from
+ * /api/submissions, already scored by the server against the answer key.
  * Identity = random owner token in localStorage; the server marks rows owned by
  * this browser with `mine: true` (one row per benchmark).
  */
@@ -294,7 +293,7 @@
     let parsed;
     if (lower.endsWith(".json")) parsed = rowsFromJSON(text);
     else if (lower.endsWith(".csv") || lower.endsWith(".tsv")) parsed = rowsFromCSV(text);
-    else return { clean: null, errors: ["Unsupported file type: upload a .csv, .tsv or .json file."] };
+    else return { clean: null, errors: ["Upload the .json file you produced. CSV also works if it has the columns name, benchmark, average_time_per_example, id and intent."] };
     if (!parsed.rows) return { clean: null, errors: parsed.errors };
 
     const byBench = {};
@@ -1107,7 +1106,7 @@
     el.btnSubmitUpload.textContent = "Submit";
     if (!file) {
       el.dropzoneFile.textContent = "";
-      showValidation(["No file received. Drop a single .csv or .json file."]);
+      showValidation(["No file received. Drop the .json file you produced."]);
       return;
     }
     el.dropzoneFile.textContent = `${file.name} (${(file.size / 1024).toFixed(0)} KB)`;

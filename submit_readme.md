@@ -1,11 +1,12 @@
 # Submitting to the leaderboard
 
-You upload **predictions**, not scores. The site checks them against the answer
-key and puts the accuracy on the ladder.
+You upload predictions. The site scores them against the answer key and puts the
+accuracy on the ladder.
 
 ## The file
 
-One JSON file, both benchmarks in it, uploaded once.
+One JSON file holding both benchmarks. Re-upload whenever you have something
+better.
 
 ```json
 [
@@ -15,7 +16,7 @@ One JSON file, both benchmarks in it, uploaded once.
     "average_time_per_example": 7.02,
     "predictions": [
       { "id": 1, "intent": "card_arrival" },
-      { "id": 2, "intent": "lost_card" }
+      { "id": 2, "intent": "lost_or_stolen_card" }
     ]
   },
   {
@@ -27,20 +28,47 @@ One JSON file, both benchmarks in it, uploaded once.
 ]
 ```
 
-| Field                      | Meaning                                               |
-|----------------------------|-------------------------------------------------------|
-| `name`                     | your name, as it should appear on the board           |
-| `benchmark`                | `A` or `B`                                            |
-| `average_time_per_example` | milliseconds per message, measured on a Colab T4      |
-| `predictions`              | one `{id, intent}` for every row of that `test.tsv`   |
+| Field                      | Meaning                                              |
+|----------------------------|------------------------------------------------------|
+| `name`                     | your name, as it should appear on the board          |
+| `benchmark`                | `A` or `B`                                           |
+| `average_time_per_example` | milliseconds per message, the number you measured    |
+| `predictions`              | one `{id, intent}` for every row of that `test.tsv`  |
 
-- 3,080 predictions for A, 4,500 for B. Every id, once.
-- `intent` is spelled exactly as in `intents.txt`.
-- Use the same name for both benchmarks so you appear once in the overall standing.
+- `id` is the `id` column of that benchmark's `test.tsv`. They run 1 to 3,080 for
+  A and 1 to 4,500 for B, and both start at 1. Not the row number of your
+  dataframe.
+- One prediction per id, all of them. 3,080 for A, 4,500 for B.
+- `intent` is copied exactly from `intents.txt`. `Card Arrival` is not
+  `card_arrival`.
+- Use the same name in both entries. A file with two names is rejected.
+
+Building the file from a dataframe of predictions:
+
+```python
+import json
+
+entries = []
+for benchmark, test, predicted, ms in runs:      # your two runs
+    entries.append({
+        "name": "Jane Doe",
+        "benchmark": benchmark,
+        "average_time_per_example": float(ms),
+        "predictions": [{"id": int(i), "intent": str(p)}
+                        for i, p in zip(test["id"], predicted)],
+    })
+
+with open("predictions.json", "w") as f:
+    json.dump(entries, f)
+```
+
+`int()` and `float()` matter: numpy types will not serialise.
 
 Template: [`predictions.json`](examples/predictions.json).
 
-Press Submit and the site tells you your accuracy straight away.
+The site checks your ids and your category names and tells you what is wrong. If
+it accepts the file, it shows your accuracy immediately. That number is your
+score on part of the test set; the final ranking uses the part you are not shown.
 
 ## Editing and deleting
 

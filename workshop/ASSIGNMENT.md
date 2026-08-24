@@ -5,7 +5,8 @@
 You get two collections of short customer service messages, Benchmark A and
 Benchmark B. For each one, build a system that reads a message and decides which
 category it belongs to. The data files call the categories "intents". For
-example, "I lost my card, what do I do?" belongs to the category `lost_card`.
+example, "I lost my card, what do I do?" belongs to the category
+`lost_or_stolen_card`.
 
 |  | Benchmark A | Benchmark B |
 |---|---|---|
@@ -70,7 +71,8 @@ your own that stands on its own.
 ## The leaderboard
 
 Upload one JSON file with your name, how fast your system ran, and a category
-for every message in `test.tsv`. Both benchmarks go in the same file.
+for every message in `test.tsv`. Both benchmarks go in the same file. The `id`
+comes from `test.tsv`, and the category is spelled as in `intents.txt`.
 
 ```json
 [

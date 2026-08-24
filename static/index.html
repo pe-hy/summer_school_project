@@ -34,7 +34,7 @@
       <p>Fast and Accurate Text Classification: two benchmarks, each with its own ladder,
         ranked by accuracy. The overall standing is the average of your two accuracies.
         A skipped benchmark counts as 0.</p>
-      <p>Everything is timed on a Colab T4, so the numbers are comparable.
+      <p>You time your own system on a Colab T4, so the numbers are comparable.
         <a href="/assignment">Read the assignment</a></p>
     </section>
 
@@ -154,7 +154,7 @@
       <div class="plot-head">
         <div>
           <h3 class="plot-title">Accuracy vs. latency</h3>
-          <p class="plot-sub">Every dot is one result and top left is best.
+          <p class="plot-sub">Every dot is one result. Ladders rank by accuracy; the time is shown, not ranked.
             Tick the boxes in the table to put names on the plots, or hover a dot.</p>
         </div>
         <button type="button" class="btn btn-ghost btn-sm btn-label-all" disabled>Show all names</button>
@@ -184,7 +184,7 @@
         · <a href="/assignment" target="_blank" rel="noopener">assignment</a>.      </p>
 
       <label class="dropzone" id="dropzone" for="file-input">
-        <input type="file" id="file-input" class="visually-hidden" accept=".csv,.json,text/csv,application/json">
+        <input type="file" id="file-input" class="visually-hidden" accept=".json,application/json">
         <span class="dropzone-icon" aria-hidden="true">⬆</span>
         <span class="dropzone-text"><strong>Choose a file</strong> or drag &amp; drop it here</span>
         <span class="dropzone-file" id="dropzone-file"></span>
