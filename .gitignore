@@ -1,13 +1,15 @@
 # runtime database (NoSQL document store, created on first run)
-data/
+/data/
 # tokens written by seed_demo.py
 seed_tokens.txt
 __pycache__/
 *.pyc
 .venv/
-data/*.lock
+/data/*.lock
 # organiser key written by deploy/deploy_pythonanywhere.py
 deploy/.admin_key
 deploy/.pa_token
 # instructor-only material — NEVER commit or serve (public repo!)
 workshop/INSTRUCTOR_NOTES.md
+# answer key for the unlabeled pool (instructor only)
+workshop/data/_instructor/
