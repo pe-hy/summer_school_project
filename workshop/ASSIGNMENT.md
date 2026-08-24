@@ -40,8 +40,19 @@ Two rules:
 2. `test.tsv` is only for measuring. Never train on it and never let your
    labeling pipeline see it.
 
-You have no labels for `test.tsv` and you never will. Hold out part of the pool
-as your own validation set.
+You have no labels for `test.tsv` and you never will, so keep your own
+validation set: hold out part of the pool before you train and never train on it.
+
+Know what it measures. Those labels came from your own pipeline, so the number
+says how well your model agrees with your labels, not how often it is right. It
+will catch a broken run and separate two systems that differ a lot. It cannot
+settle a close call, and a model that copies every mistake in your labels scores
+100 percent on it. Hand-label some of the held-out messages yourself and you
+also learn how good your labels are, which is usually the thing worth improving.
+
+The leaderboard is the real test. It scores against the answer key, takes as
+many submissions as you like, shows you your score on part of the test set, and
+ranks you on the rest.
 
 ## What counts
 
