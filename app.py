@@ -22,6 +22,7 @@ import io
 import hmac
 import json
 import os
+import random
 import shutil
 import stat
 import sys
@@ -53,10 +54,11 @@ ADMIN_KEY = os.environ.get("LEADERBOARD_ADMIN_KEY") or None
 # Submission schema (keep in sync with static/app.js and submit_readme.md)
 # ----------------------------------------------------------------------------
 STRING_FIELDS = ("name",)
-NUMBER_FIELDS = ("metric", "latency_ms")
+NUMBER_FIELDS = ("latency_ms",)
 NON_NEGATIVE_FIELDS = ("latency_ms",)
 BENCHMARKS = ("A", "B")
-FIELDS = STRING_FIELDS + ("benchmark",) + NUMBER_FIELDS
+FIELDS = STRING_FIELDS + ("benchmark", "latency_ms", "predictions")
+MAX_ABS_LATENCY = 1e7          # 10,000 s per message is beyond any real run
 MAX_NAME_LEN = 80
 MAX_ABS_NUMBER = 1e15          # anything bigger is certainly a mistake
 MAX_SUBMISSIONS = 500          # hard cap on rows (the API is unauthenticated)
@@ -123,7 +125,7 @@ class AtomicJSONStorage(Storage):
 
 
 app = Flask(__name__, static_folder=None)
-app.config["MAX_CONTENT_LENGTH"] = 64 * 1024  # 64 KB is plenty for one row
+app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024  # predictions for both test sets, with room to spare
 app.json.sort_keys = False
 app.json.ensure_ascii = False
 
@@ -187,19 +189,145 @@ with db_lock():
 
 
 # ----------------------------------------------------------------------------
+# Answer keys (instructor-only files; never served, only used to score)
+# ----------------------------------------------------------------------------
+PUBLIC_SHARE = 0.4        # the slice the board scores against; the rest decides the final ranking
+SPLIT_SEED = 20260824
+
+
+def _load_answer_keys() -> dict[str, dict[int, str]]:
+    keys: dict[str, dict[int, str]] = {}
+    for bench in BENCHMARKS:
+        path = BASE_DIR / "workshop" / "data" / "_instructor" / f"test_labels_{bench.lower()}.tsv"
+        gold: dict[int, str] = {}
+        if path.exists():
+            with open(path, encoding="utf-8") as fh:
+                next(fh, None)                       # header
+                for line in fh:
+                    parts = line.rstrip("\n").split("\t")
+                    if len(parts) == 2 and parts[0].isdigit():
+                        gold[int(parts[0])] = parts[1]
+        keys[bench] = gold
+        print(f"answer key {bench}: {len(gold):,} test labels" if gold
+              else f"WARNING: no answer key for benchmark {bench} at {path} - submissions will be refused",
+              file=sys.stderr)
+    return keys
+
+
+def _public_split(keys: dict[str, dict[int, str]]) -> dict[str, set[int]]:
+    """A fixed random slice of each test set. The board shows the score on this
+    slice only, so tuning against the leaderboard does not transfer to the final
+    ranking, which uses the remaining rows."""
+    split: dict[str, set[int]] = {}
+    for bench, gold in keys.items():
+        ids = sorted(gold)
+        random.Random(f"{SPLIT_SEED}-{bench}").shuffle(ids)
+        split[bench] = set(ids[:max(1, round(len(ids) * PUBLIC_SHARE))])
+    return split
+
+
+def _load_intents() -> dict[str, set[str]]:
+    out: dict[str, set[str]] = {}
+    for bench in BENCHMARKS:
+        path = BASE_DIR / "workshop" / "data" / f"benchmark_{bench.lower()}" / "intents.txt"
+        out[bench] = set(path.read_text(encoding="utf-8").split()) if path.exists() else set()
+    return out
+
+
+ANSWER_KEYS = _load_answer_keys()
+PUBLIC_IDS = _public_split(ANSWER_KEYS)
+INTENTS = _load_intents()
+
+
+def score_predictions(bench: str, predictions: object) -> tuple[dict | None, list[str]]:
+    """Return (scores, errors). scores has the public 'metric' shown on the board
+    and 'metric_hidden' for the final ranking. predictions: [{"id", "intent"}, ...]"""
+    gold = ANSWER_KEYS.get(bench) or {}
+    if not gold:
+        return None, [f"Benchmark {bench} cannot be scored right now. Tell an organiser."]
+    if not isinstance(predictions, list):
+        return None, [f"Benchmark {bench}: 'predictions' must be a list of {{id, intent}} objects."]
+    if len(predictions) > 2 * len(gold) + 10:
+        return None, [f"Benchmark {bench}: far too many rows ({len(predictions)}); expected {len(gold):,}."]
+
+    seen: dict[int, str] = {}
+    bad_rows = 0
+    unknown_ids: list[int] = []
+    for item in predictions:
+        if not isinstance(item, dict):
+            bad_rows += 1
+            continue
+        raw_id, intent = item.get("id"), item.get("intent")
+        if isinstance(raw_id, str) and raw_id.strip().isdigit():
+            raw_id = int(raw_id.strip())
+        if isinstance(raw_id, bool) or not isinstance(raw_id, int) or not isinstance(intent, str):
+            bad_rows += 1
+            continue
+        if raw_id not in gold:
+            unknown_ids.append(raw_id)
+            continue
+        seen[raw_id] = intent.strip()
+
+    errors = []
+    allowed = INTENTS.get(bench) or set()
+    if allowed:
+        unknown = sorted({i for i in seen.values() if i not in allowed})
+        if unknown:
+            errors.append(f"Benchmark {bench}: {len(unknown)} category name(s) are not in intents.txt, "
+                          f"for example {unknown[:3]}. Copy the names exactly as they appear there.")
+    if bad_rows:
+        errors.append(f"Benchmark {bench}: {bad_rows} row(s) are not a valid id/intent pair.")
+    if unknown_ids:
+        errors.append(f"Benchmark {bench}: {len(unknown_ids)} id(s) are not in test.tsv, "
+                      f"for example {sorted(unknown_ids)[:3]}.")
+    missing = len(gold) - len(seen)
+    if missing > 0:
+        absent = sorted(set(gold) - set(seen))[:3]
+        errors.append(f"Benchmark {bench}: {missing:,} of {len(gold):,} test messages have no prediction, "
+                      f"for example id {absent}. Predict every row of test.tsv.")
+    if errors:
+        return None, errors
+    public = PUBLIC_IDS.get(bench) or set(gold)
+    hidden = [i for i in gold if i not in public]
+    public_correct = sum(1 for i in public if seen.get(i) == gold[i])
+    hidden_correct = sum(1 for i in hidden if seen.get(i) == gold[i])
+    return {
+        "metric": public_correct / len(public),
+        "metric_hidden": (hidden_correct / len(hidden)) if hidden else None,
+    }, []
+
+
+# ----------------------------------------------------------------------------
 # Validation
 # ----------------------------------------------------------------------------
 def validate_entry(data: object) -> tuple[dict | None, list[str]]:
-    """Return (clean_entry, errors). clean_entry is None when errors exist."""
+    """One benchmark's submission: name, benchmark, latency_ms and predictions.
+    The accuracy is computed here from the answer key, never taken from the client."""
     errors: list[str] = []
     if not isinstance(data, dict):
-        return None, ["Submission must be a JSON object."]
+        return None, ["Each result must be an object with name, benchmark, latency_ms and predictions."]
 
     unknown = sorted(str(k).encode("utf-8", "replace").decode("utf-8")[:40] for k in set(data) - set(FIELDS))
     if unknown:
         errors.append("Unexpected field(s): " + ", ".join(unknown))
 
     clean: dict = {}
+    if "name" not in data:
+        errors.append("Missing field 'name'.")
+    else:
+        value = data["name"]
+        if not isinstance(value, str) or not value.strip():
+            errors.append("'name' must be a non-empty text value.")
+        else:
+            value = unicodedata.normalize("NFC", " ".join(value.split()))
+            if len(value) > MAX_NAME_LEN:
+                errors.append(f"'name' must be at most {MAX_NAME_LEN} characters.")
+            elif any(unicodedata.category(c) in INVALID_CATEGORIES for c in value):
+                errors.append("'name' contains invisible or control characters.")
+            else:
+                clean["name"] = value
+
+    bench = None
     if "benchmark" not in data:
         errors.append("Missing field 'benchmark'.")
     else:
@@ -208,45 +336,28 @@ def validate_entry(data: object) -> tuple[dict | None, list[str]]:
             errors.append('\'benchmark\' must be "A" or "B".')
         else:
             clean["benchmark"] = bench
-    for field in STRING_FIELDS:
-        if field not in data:
-            errors.append(f"Missing field '{field}'.")
-            continue
-        value = data[field]
-        if not isinstance(value, str) or not value.strip():
-            errors.append(f"'{field}' must be a non-empty text value.")
-            continue
-        value = unicodedata.normalize("NFC", " ".join(value.split()))  # collapse whitespace
-        if len(value) > MAX_NAME_LEN:
-            errors.append(f"'{field}' must be at most {MAX_NAME_LEN} characters.")
-            continue
-        # control, format (zero-width, bidi overrides), surrogate and private-use characters
-        if any(unicodedata.category(c) in INVALID_CATEGORIES for c in value):
-            errors.append(f"'{field}' contains invisible or control characters.")
-            continue
-        clean[field] = value
 
-    for field in NUMBER_FIELDS:
-        if field not in data:
-            errors.append(f"Missing field '{field}'.")
-            continue
-        value = data[field]
-        # bool is a subclass of int in Python; reject it explicitly.
-        # Huge ints would overflow float(), hence the try/except.
+    if "latency_ms" not in data:
+        errors.append("Missing field 'latency_ms'.")
+    else:
+        value = data["latency_ms"]
         try:
             number = float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
         except OverflowError:
             number = None
-        if number is None or number != number or abs(number) > MAX_ABS_NUMBER:
-            errors.append(f"'{field}' must be a finite number (|x| <= {MAX_ABS_NUMBER:g}).")
-            continue
-        if field in NON_NEGATIVE_FIELDS and number < 0:
-            errors.append(f"'{field}' must be >= 0.")
-            continue
-        if field == "metric" and not 0 <= number <= 1:
-            errors.append("'metric' must be between 0 and 1, accuracy as a fraction (93.12 % is 0.9312).")
-            continue
-        clean[field] = number
+        if number is None or number != number or not 0 <= number <= MAX_ABS_LATENCY:
+            errors.append("'latency_ms' must be a number of milliseconds per message, 0 or more.")
+        else:
+            clean["latency_ms"] = number
+
+    if "predictions" not in data:
+        errors.append("Missing field 'predictions'.")
+    elif bench is not None and not errors:
+        scores, score_errors = score_predictions(bench, data["predictions"])
+        if score_errors:
+            errors.extend(score_errors)
+        else:
+            clean.update(scores)
 
     return (clean, []) if not errors else (None, errors)
 
@@ -299,7 +410,7 @@ def public_row(doc: dict, owner_hash: str | None) -> dict:
         "id": doc.get("id"),
         "name": doc.get("name", ""),
         "benchmark": doc.get("benchmark"),
-        "metric": doc.get("metric"),
+        "metric": doc.get("metric"),   # public slice only; metric_hidden is never served
         "latency_ms": doc.get("latency_ms"),
         "person_key": doc.get("person_key"),
         "submitted_at": doc.get("submitted_at", ""),

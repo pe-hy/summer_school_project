@@ -16,7 +16,8 @@
     REFRESH_MS: 10000,
     MAX_NAME_LEN: 80,
     MAX_ABS_NUMBER: 1e15,
-    MAX_FILE_BYTES: 64 * 1024,
+    MAX_FILE_BYTES: 8 * 1024 * 1024,
+    TEST_ROWS: { A: 3080, B: 4500 },
     LATENCY_FLOOR_MS: 0.01,   // clamp for the log axis only
   };
   const BENCHMARKS = [
@@ -25,11 +26,10 @@
   ];
   const BENCH_KEYS = BENCHMARKS.map((b) => b.key);
 
-  const FIELDS = ["name", "benchmark", "metric", "latency_ms"];
-  const STRING_FIELDS = ["name"];
-  const NUMBER_FIELDS = ["metric", "latency_ms"];
+  const PRED_FIELDS = ["benchmark", "id", "intent"];
 
   const TOKEN_KEY = "ostrai_owner_token";
+  const NAME_KEY = "ostrai_name";
 
   // ---------------------------------------------------------------------------
   // DOM
@@ -56,7 +56,8 @@
     dropzoneFile: $("#dropzone-file"),
     validationBox: $("#validation-box"),
     warnBox: $("#warn-box"),
-    benchChooser: $("#bench-chooser"),
+    nameInput: $("#name-input"),
+    latencyInputs: {},
     previewBox: $("#preview-box"),
     previewEntries: $("#preview-entries"),
     dialogNote: $("#dialog-note"),
@@ -82,8 +83,7 @@
     fileSeq: 0,
     submitting: false,
     pending: null,                  // validated entries waiting for submit
-    pendingFile: null,              // {name, text} for bench-chooser re-runs
-    uploadScope: null,              // null | "A" | "B"
+    pendingFile: null,              // {name, text} of the parsed file
     deleteBench: null,
     statusKey: null,
     views: {},                      // per-table sort state + caches, filled below
@@ -158,20 +158,13 @@
   const stripBOM = (s) => s.replace(/^\uFEFF/, "");
   const normalizeHeader = (h) => stripBOM(String(h)).toLowerCase().replace(/[^a-z0-9]/g, "");
   const CANONICAL_BY_NORMALIZED = {
-    ...Object.fromEntries(FIELDS.map((f) => [normalizeHeader(f), f])),
-    accuracy: "metric",
-    acc: "metric",
-    latency: "latency_ms",
-    latencyms: "latency_ms",
-    latencymsexample: "latency_ms",
-    latencymsex: "latency_ms",
-    bench: "benchmark",
-    project: "benchmark",
+    benchmark: "benchmark", bench: "benchmark", project: "benchmark", task: "benchmark",
+    id: "id", messageid: "id", exampleid: "id", testid: "id",
+    intent: "intent", label: "intent", category: "intent", prediction: "intent", predictedintent: "intent",
   };
   // Headers from the OLD schema get a pointed error instead of silent misreads.
-  const SECONDS_TRAP = new Set(["avgtimes", "avgtimeexamples", "avgtimeperexamples",
-    "averagetimeperexamples", "averagetimeperexample", "seconds", "timeperexample", "avgtimeexample"]);
-  const SECONDS_TRAP_MSG = "Latency is now milliseconds per example: multiply your seconds by 1000 and name the column 'latency_ms'.";
+  const OLD_SCHEMA = new Set(["metric", "accuracy", "acc", "latencyms", "latency", "avgtimes", "name"]);
+  const OLD_SCHEMA_MSG = "This looks like the old results format. Upload your predictions now: one row per test message with the columns benchmark, id, intent. Your name and speed are asked for below.";
 
   function normalizeBenchmark(v) {   // mirrors app.py normalize_benchmark
     if (typeof v !== "string") return null;
@@ -220,163 +213,105 @@
     return Number(s);
   }
 
-  function entriesFromCSV(text) {
+  function rowsFromCSV(text) {
     text = stripBOM(text);
     const headerLine = text.split(/\r?\n/).find((l) => l.trim() !== "") || "";
-    const delimiter = detectDelimiter(headerLine);
-    const rows = parseCSV(text, delimiter);
+    const rows = parseCSV(text, detectDelimiter(headerLine));
     if (rows.length === 0) return { errors: ["The file is empty."] };
-    if (rows.length < 2) return { errors: ["Missing data rows: the file needs a header line and one or two data lines."] };
-    if (rows.length > 3) return { errors: [`A file holds one result per benchmark, at most two data rows. Found ${rows.length - 1}.`] };
+    if (rows.length < 2) return { errors: ["The file has a header but no predictions."] };
 
-    const errors = [];
     const header = rows[0].map((h) => h.trim());
     const keys = header.map((h) => {
       const norm = normalizeHeader(h);
-      if (SECONDS_TRAP.has(norm)) { errors.push(SECONDS_TRAP_MSG); return null; }
-      return CANONICAL_BY_NORMALIZED[norm] || null;
+      return CANONICAL_BY_NORMALIZED[norm] || (OLD_SCHEMA.has(norm) ? "__old__" : null);
     });
-    const unknown = header.filter((h, i) => keys[i] === null && !SECONDS_TRAP.has(normalizeHeader(h)));
-    if (unknown.length) errors.push("Unexpected column(s): " + unknown.map((u) => `'${u || "(empty)"}'`).join(", "));
-    const seen = new Set();
-    for (const k of keys) {
-      if (k && seen.has(k)) errors.push(`Duplicate column '${k}'.`);
-      if (k) seen.add(k);
+    if (keys.includes("__old__")) return { errors: [OLD_SCHEMA_MSG] };
+    const missing = PRED_FIELDS.filter((f) => !keys.includes(f));
+    if (missing.length) {
+      return { errors: [`Missing column(s): ${missing.join(", ")}. The file needs benchmark, id and intent.`] };
     }
-    if (errors.length) return { errors };
-
-    const entries = [];
+    const out = [];
     for (let r = 1; r < rows.length; r++) {
-      const values = rows[r].map((v) => v.trim());
+      const values = rows[r];
       if (values.length !== header.length) {
-        errors.push(`Data row ${r} has ${values.length} value(s) but the header has ${header.length} column(s). Check the delimiter and quoting.`);
-        continue;
+        return { errors: [`Row ${r} has ${values.length} value(s) but the header has ${header.length} column(s).`] };
       }
       const obj = {};
-      keys.forEach((k, i) => {
-        if (!k) return;
-        obj[k] = NUMBER_FIELDS.includes(k) ? parseNumberString(values[i]) : values[i];
-      });
-      entries.push(obj);
+      keys.forEach((k, i) => { if (k) obj[k] = values[i].trim(); });
+      out.push(obj);
     }
-    return errors.length ? { errors } : { entries, errors: [] };
+    return { rows: out, errors: [] };
   }
 
-  function entriesFromJSON(text) {
+  function rowsFromJSON(text) {
     let data;
     try { data = JSON.parse(stripBOM(text)); }
     catch (e) { return { errors: [`Invalid JSON: ${e.message}`] }; }
-    if (!Array.isArray(data)) data = [data];
-    if (data.length === 0) return { errors: ["The file is empty."] };
-    if (data.length > 2) return { errors: [`A file holds one result per benchmark, at most two objects. Found ${data.length}.`] };
-    const errors = [];
-    const entries = [];
+    if (!Array.isArray(data)) return { errors: ["The JSON must be an array of {benchmark, id, intent} objects."] };
+    if (!data.length) return { errors: ["The file is empty."] };
+    const out = [];
     for (const item of data) {
       if (item === null || typeof item !== "object" || Array.isArray(item)) {
-        errors.push("Each result must be an object with the keys name, benchmark, metric, latency_ms.");
-        continue;
+        return { errors: ["Every entry must be an object with benchmark, id and intent."] };
       }
       const obj = {};
-      const unknown = [];
+      let sawOld = false;
       for (const [k, v] of Object.entries(item)) {
         const norm = normalizeHeader(k);
-        if (SECONDS_TRAP.has(norm)) { errors.push(SECONDS_TRAP_MSG); continue; }
         const key = CANONICAL_BY_NORMALIZED[norm];
-        if (!key) { unknown.push(k); continue; }
-        obj[key] = (NUMBER_FIELDS.includes(key) && typeof v === "string") ? parseNumberString(v) : v;
+        if (!key) { if (OLD_SCHEMA.has(norm)) sawOld = true; continue; }
+        obj[key] = typeof v === "string" ? v.trim() : v;
       }
-      if (unknown.length) errors.push("Unexpected key(s): " + unknown.map((u) => `'${u}'`).join(", "));
-      entries.push(obj);
+      if (sawOld && obj.id === undefined) return { errors: [OLD_SCHEMA_MSG] };
+      out.push(obj);
     }
-    return errors.length ? { errors } : { entries, errors: [] };
+    return { rows: out, errors: [] };
+  }
+
+  // Group prediction rows per benchmark and check them before anything is sent.
+  function parseSubmissionFile(name, text) {
+    const lower = name.toLowerCase();
+    let parsed;
+    if (lower.endsWith(".json")) parsed = rowsFromJSON(text);
+    else if (lower.endsWith(".csv") || lower.endsWith(".tsv")) parsed = rowsFromCSV(text);
+    else return { clean: null, errors: ["Unsupported file type: upload a .csv, .tsv or .json file."] };
+    if (!parsed.rows) return { clean: null, errors: parsed.errors };
+
+    const byBench = {};
+    const errors = [];
+    const badBench = new Set();
+    for (const row of parsed.rows) {
+      const bench = normalizeBenchmark(String(row.benchmark ?? ""));
+      if (!bench) { badBench.add(String(row.benchmark ?? "(empty)").slice(0, 20)); continue; }
+      const id = Number(row.id);
+      if (!Number.isInteger(id)) { errors.push(`Benchmark ${bench}: '${row.id}' is not a whole-number id.`); break; }
+      const intent = String(row.intent ?? "").trim();
+      if (!intent) { errors.push(`Benchmark ${bench}: id ${id} has no intent.`); break; }
+      (byBench[bench] = byBench[bench] || []).push({ id, intent });
+    }
+    if (badBench.size) {
+      errors.push(`The benchmark column must say A or B, found ${[...badBench].slice(0, 3).map((b) => `'${b}'`).join(", ")}.`);
+    }
+    const benches = Object.keys(byBench).sort();
+    if (!errors.length && !benches.length) errors.push("No predictions found in the file.");
+    for (const bench of benches) {
+      const rows = byBench[bench];
+      const ids = new Set(rows.map((r) => r.id));
+      if (ids.size !== rows.length) {
+        errors.push(`Benchmark ${bench}: ${rows.length - ids.size} duplicate id(s). Predict each test message once.`);
+      }
+      const expected = CONFIG.TEST_ROWS[bench];
+      if (expected && rows.length !== expected) {
+        errors.push(`Benchmark ${bench}: ${rows.length.toLocaleString()} predictions, but test.tsv has ${expected.toLocaleString()} messages. Predict every row.`);
+      }
+    }
+    if (errors.length) return { clean: null, errors };
+    return { clean: benches.map((bench) => ({ benchmark: bench, predictions: byBench[bench] })), errors: [] };
   }
 
   // ---------------------------------------------------------------------------
   // Validation (keep in sync with app.py validate_entry / validate_submission)
   // ---------------------------------------------------------------------------
-  const describe = (v) => {
-    if (v === null) return "null";
-    if (v === undefined) return "missing";
-    if (Array.isArray(v)) return "a list";
-    if (typeof v === "object") return "an object";
-    if (typeof v === "string") return `'${v.length > 40 ? v.slice(0, 40) + "…" : v}'`;
-    return String(v);
-  };
-
-  function validateEntry(obj) {
-    const errors = [];
-    const clean = {};
-    const nv = obj.name;
-    if (nv === undefined) errors.push("Missing column 'name'.");
-    else if (typeof nv !== "string") errors.push(`'name' must be text, got ${describe(nv)}.`);
-    else {
-      const s = nv.trim().replace(/\s+/g, " ");
-      if (!s) errors.push("'name' must not be empty.");
-      else if (s.length > CONFIG.MAX_NAME_LEN) errors.push(`'name' must be at most ${CONFIG.MAX_NAME_LEN} characters.`);
-      else if (/[\p{Cc}\p{Cf}\p{Cs}\p{Co}\p{Cn}]/u.test(s)) errors.push("'name' contains invisible or control characters.");
-      else clean.name = s;
-    }
-    if (obj.benchmark === undefined) errors.push("Missing column 'benchmark'.");
-    else {
-      const b = normalizeBenchmark(obj.benchmark);
-      if (b === null) errors.push(`'benchmark' must be "A" or "B", got ${describe(obj.benchmark)}.`);
-      else clean.benchmark = b;
-    }
-    for (const f of NUMBER_FIELDS) {
-      const v = obj[f];
-      if (v === undefined) { errors.push(`Missing column '${f}'.`); continue; }
-      if (typeof v !== "number" || !Number.isFinite(v) || Math.abs(v) > CONFIG.MAX_ABS_NUMBER) {
-        const hint = typeof v === "string" && /\d,\d/.test(v) ? " (use a dot as decimal separator, no thousands separators)" : "";
-        errors.push(`'${f}' must be a number such as ${f === "metric" ? "0.93" : "2.31"}, got ${describe(v)}${hint}.`);
-        continue;
-      }
-      if (f === "latency_ms" && v < 0) { errors.push("'latency_ms' must be >= 0."); continue; }
-      if (f === "metric" && (v < 0 || v > 1)) { errors.push("'metric' must be between 0 and 1, accuracy as a fraction (93.12 % is 0.9312)."); continue; }
-      clean[f] = v;
-    }
-    return { clean: errors.length ? null : clean, errors };
-  }
-
-  // Full-file validation. injectBench fills a missing benchmark (bench-chooser /
-  // scoped upload); needsBenchChoice is set when exactly one row lacks it.
-  function parseSubmissionFile(name, text, injectBench) {
-    const lower = name.toLowerCase();
-    let parsed;
-    if (lower.endsWith(".json")) parsed = entriesFromJSON(text);
-    else if (lower.endsWith(".csv")) parsed = entriesFromCSV(text);
-    else return { clean: null, errors: ["Unsupported file type: please upload a .csv or .json file."] };
-    if (!parsed.entries) return { clean: null, errors: parsed.errors };
-
-    const raws = parsed.entries;
-    if (injectBench && raws.length === 1 && raws[0].benchmark === undefined) {
-      raws[0] = { ...raws[0], benchmark: injectBench };
-    }
-    const needsBenchChoice = raws.length === 1 && raws[0].benchmark === undefined;
-
-    const errors = [];
-    const clean = [];
-    for (let i = 0; i < raws.length; i++) {
-      const v = validateEntry(raws[i]);
-      const rowBench = normalizeBenchmark(raws[i].benchmark);
-      const prefix = raws.length > 1
-        ? `Row ${i + 1}${rowBench ? ` (Benchmark ${rowBench})` : ""}: `
-        : "";
-      errors.push(...v.errors.map((e) => prefix + e));
-      if (v.clean) clean.push(v.clean);
-    }
-    if (!errors.length) {
-      const benches = clean.map((e) => e.benchmark);
-      if (new Set(benches).size !== benches.length) {
-        errors.push("Both results are for the same benchmark. One must be A and one B.");
-      }
-      const names = [...new Set(clean.map((e) => e.name))];
-      if (names.length > 1) {
-        errors.push(`Both results must carry the same name, not '${names[0]}' and '${names[1]}'.`);
-      }
-    }
-    return { clean: errors.length ? null : clean, errors, needsBenchChoice };
-  }
-
   // ---------------------------------------------------------------------------
   // Scoring & standings
   // ---------------------------------------------------------------------------
@@ -906,7 +841,7 @@
           rep.type = "button";
           rep.className = "btn btn-ghost btn-sm";
           rep.textContent = "Replace";
-          rep.addEventListener("click", () => openUploadDialog(bench));
+          rep.addEventListener("click", () => openUploadDialog());
           const del = document.createElement("button");
           del.type = "button";
           del.className = "btn btn-ghost btn-sm";
@@ -922,7 +857,7 @@
           up.type = "button";
           up.className = "btn btn-ghost btn-sm";
           up.textContent = "Upload";
-          up.addEventListener("click", () => openUploadDialog(bench));
+          up.addEventListener("click", () => openUploadDialog());
           slot.appendChild(up);
         }
         box.appendChild(slot);
@@ -1013,29 +948,28 @@
     state.pending = null;
     state.pendingFile = null;
     state.fileSeq++;
+    el.latencyInputs = {};
     el.fileInput.value = "";
     el.dropzoneFile.textContent = "";
     el.validationBox.hidden = true;
     el.validationBox.replaceChildren();
+    el.validationBox.className = "validation";
     el.warnBox.hidden = true;
     el.warnBox.replaceChildren();
-    el.benchChooser.hidden = true;
-    for (const r of el.benchChooser.querySelectorAll("input")) r.checked = false;
     el.previewBox.hidden = true;
     el.previewEntries.replaceChildren();
     el.btnSubmitUpload.disabled = true;
     el.btnSubmitUpload.textContent = "Submit";
-    const scope = state.uploadScope;
-    el.uploadTitle.textContent = scope
-      ? (state.mine[scope] ? `Replace your Benchmark ${scope} result` : `Upload your Benchmark ${scope} result`)
-      : "Upload results";
-    el.dialogNote.textContent = !storageOk
-      ? "Storage is blocked in this browser, so after a reload you will not be able to edit or delete these results."
-      : "Your browser remembers this upload so you can replace or delete each result later.";
+    el.uploadTitle.textContent = "Upload predictions";
+    let remembered = "";
+    try { remembered = localStorage.getItem(NAME_KEY) || ""; } catch (_) { /* ignore */ }
+    el.nameInput.value = remembered || (state.mine.A || state.mine.B || {}).name || "";
+    el.dialogNote.textContent = storageOk
+      ? "Your browser remembers this upload so you can replace or delete it later."
+      : "Storage is blocked in this browser, so you will not be able to edit these results after a reload.";
   }
 
-  function openUploadDialog(scope) {
-    state.uploadScope = BENCH_KEYS.includes(scope) ? scope : null;
+  function openUploadDialog() {
     resetUploadDialog();
     el.uploadDialog.showModal();
   }
@@ -1070,11 +1004,6 @@
 
   function collectWarnings(entries) {
     const warnings = [];
-    for (const e of entries) {
-      const tag = entries.length > 1 ? `Benchmark ${e.benchmark}: ` : "";
-      if (e.latency_ms > 0 && e.latency_ms < 0.05) warnings.push(`${tag}faster than 20 000 examples per second. Did you report seconds instead of milliseconds?`);
-      if (e.metric > 0.999) warnings.push(`${tag}accuracy above 99.9 %. Double-check the fraction.`);
-    }
     if (entries.length === 1) {
       const other = BENCH_KEYS.find((b) => b !== entries[0].benchmark);
       if (!state.mine[other]) {
@@ -1084,31 +1013,74 @@
     return warnings;
   }
 
+  function readName() {
+    return (el.nameInput.value || "").trim().replace(/\s+/g, " ").slice(0, CONFIG.MAX_NAME_LEN);
+  }
+
+  function readLatency(bench) {
+    const input = el.latencyInputs[bench];
+    if (!input) return NaN;
+    const raw = (input.value || "").trim().replace(",", ".");
+    return raw === "" ? NaN : Number(raw);
+  }
+
+  // Submit is enabled only once the file, the name and every speed are in place.
+  function refreshSubmitState() {
+    if (!state.pending) { el.btnSubmitUpload.disabled = true; return; }
+    let problem = "";
+    if (!readName()) problem = "Type the name that should appear on the board.";
+    if (!problem) {
+      for (const e of state.pending) {
+        const ms = readLatency(e.benchmark);
+        if (!Number.isFinite(ms) || ms < 0) { problem = `Type your milliseconds per message for Benchmark ${e.benchmark}.`; break; }
+      }
+    }
+    el.dialogNote.textContent = problem || (storageOk
+      ? "Your browser remembers this upload so you can replace or delete it later."
+      : "Storage is blocked in this browser, so you will not be able to edit these results after a reload.");
+    el.btnSubmitUpload.disabled = Boolean(problem) || state.submitting;
+    if (!state.submitting) el.btnSubmitUpload.textContent = submitLabel(state.pending);
+  }
+
   function showPreview(entries) {
     el.previewEntries.replaceChildren();
+    el.latencyInputs = {};
     for (const e of entries) {
       const wrap = document.createElement("div");
       wrap.className = "preview-row";
       const h = document.createElement("h4");
       h.textContent = `Benchmark ${e.benchmark}`;
       wrap.appendChild(h);
+
       const dl = document.createElement("dl");
       dl.className = "preview-grid";
-      const add = (k, v, cls) => {
-        const dt = document.createElement("dt"); dt.textContent = k;
-        const dd = document.createElement("dd"); dd.textContent = v;
-        if (cls) dd.className = cls;
-        dl.append(dt, dd);
-      };
-      add("Name", e.name);
-      add("Accuracy", fmtPct(e.metric), "score-cell");
-      add("Latency", `${fmtLatency(e.latency_ms)} ms/example`);
+      const dt = document.createElement("dt"); dt.textContent = "Predictions";
+      const dd = document.createElement("dd");
+      dd.textContent = `${e.predictions.length.toLocaleString()} rows, ` +
+        `${new Set(e.predictions.map((p) => p.intent)).size} distinct categories`;
+      const dt2 = document.createElement("dt"); dt2.textContent = "Speed";
+      const dd2 = document.createElement("dd");
+      const input = document.createElement("input");
+      input.type = "number";
+      input.step = "0.01";
+      input.min = "0";
+      input.className = "latency-input";
+      input.placeholder = "7.02";
+      input.setAttribute("aria-label", `Milliseconds per message for Benchmark ${e.benchmark}`);
+      input.addEventListener("input", refreshSubmitState);
+      el.latencyInputs[e.benchmark] = input;
+      const unit = document.createElement("span");
+      unit.className = "latency-unit";
+      unit.textContent = "ms per message";
+      dd2.append(input, unit);
+      dl.append(dt, dd, dt2, dd2);
       wrap.appendChild(dl);
+
       const current = state.mine[e.benchmark];
       if (current) {
         const delta = document.createElement("p");
         delta.className = "preview-delta";
-        delta.textContent = `replaces your current Benchmark ${e.benchmark} result: accuracy ${fmtPct(current.metric)} → ${fmtPct(e.metric)}`;
+        delta.textContent = `replaces your current Benchmark ${e.benchmark} result (accuracy ${fmtPct(current.metric)})`;
         wrap.appendChild(delta);
       }
       el.previewEntries.appendChild(wrap);
@@ -1116,37 +1088,21 @@
     el.previewBox.hidden = false;
   }
 
-  function runValidation(fileName, text, injectBench) {
-    const { clean, errors, needsBenchChoice } = parseSubmissionFile(fileName, text, injectBench);
-    if (needsBenchChoice && !injectBench && !state.uploadScope) {
-      el.benchChooser.hidden = false;
-      showValidation(["The file does not say which benchmark it is. Pick one below."]);
-      return;
-    }
-    el.benchChooser.hidden = true;
+  function runValidation(fileName, text) {
+    const { clean, errors } = parseSubmissionFile(fileName, text);
     if (errors.length) { showValidation(errors); showWarnings([]); return; }
-    // scoped-upload rules
-    if (state.uploadScope) {
-      const benches = clean.map((e) => e.benchmark);
-      if (!benches.includes(state.uploadScope)) {
-        showValidation([`This file is Benchmark ${benches.join(" and ")}, but you opened it from the Benchmark ${state.uploadScope} card. Fix the file or upload it from the Benchmark ${benches[0]} card.`]);
-        showWarnings([]);
-        return;
-      }
-    }
     state.pending = clean;
-    showValidation([], { okMessage: "Looks good. Review the parsed results below and press Submit." });
+    const rows = clean.reduce((n, e) => n + e.predictions.length, 0);
+    showValidation([], { okMessage: `Read ${rows.toLocaleString()} predictions. Add your name and speed below, then press Submit.` });
     showWarnings(collectWarnings(clean));
     showPreview(clean);
-    el.btnSubmitUpload.disabled = false;
-    el.btnSubmitUpload.textContent = submitLabel(clean);
+    refreshSubmitState();
   }
 
   async function handleFile(file) {
     const seq = ++state.fileSeq;
     el.previewBox.hidden = true;
     el.warnBox.hidden = true;
-    el.benchChooser.hidden = true;
     state.pending = null;
     state.pendingFile = null;
     el.btnSubmitUpload.disabled = true;
@@ -1156,9 +1112,9 @@
       showValidation(["No file received. Drop a single .csv or .json file."]);
       return;
     }
-    el.dropzoneFile.textContent = `${file.name} (${file.size.toLocaleString()} bytes)`;
+    el.dropzoneFile.textContent = `${file.name} (${(file.size / 1024).toFixed(0)} KB)`;
     if (file.size > CONFIG.MAX_FILE_BYTES) {
-      showValidation([`File is too large (${file.size.toLocaleString()} bytes). Results are a couple of rows, well under 1 KB.`]);
+      showValidation([`File is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Predictions for both benchmarks are well under 1 MB.`]);
       return;
     }
     let text;
@@ -1166,7 +1122,7 @@
     catch (e) { if (seq === state.fileSeq) showValidation([`Could not read the file: ${e.message}`]); return; }
     if (seq !== state.fileSeq) return;
     state.pendingFile = { name: file.name, text };
-    runValidation(file.name, text, state.uploadScope || undefined);
+    runValidation(file.name, text);
   }
 
   function setSubmitting(on) {
@@ -1180,21 +1136,30 @@
 
   async function submitPending() {
     if (!state.pending || state.submitting) return;
+    const name = readName();
+    try { localStorage.setItem(NAME_KEY, name); } catch (_) { /* ignore */ }
+    const body = state.pending.map((e) => ({
+      name,
+      benchmark: e.benchmark,
+      latency_ms: readLatency(e.benchmark),
+      predictions: e.predictions,
+    }));
     setSubmitting(true);
     try {
-      const res = await api("PUT", "/api/submissions/mine", state.pending);
+      const res = await api("PUT", "/api/submissions/mine", body);
       setSubmitting(false);
       el.uploadDialog.close();
       await refresh({ silent: false });
-      const benches = (res.submissions || []).map((x) => x.benchmark).join(" and ");
-      showToast(`Result${res.submissions && res.submissions.length > 1 ? "s" : ""} for Benchmark ${benches} ${res.created ? "added to" : "updated on"} the board.`, "success");
+      const scored = (res.submissions || []).map((x) => `Benchmark ${x.benchmark}: ${fmtPct(x.metric)}`).join(", ");
+      showToast(scored ? `Scored. ${scored}` : "Submission recorded.", "success");
     } catch (err) {
       setSubmitting(false);
-      el.btnSubmitUpload.disabled = !state.pending;
       const details = err.details && err.details.length ? err.details : [err.message];
-      const title = err.status === 422 ? "The server rejected the file:" : err.status === 409 || err.status === 507 ? "Submission refused:" : "Could not submit:";
+      const title = err.status === 422 ? "The server could not score this file:"
+        : err.status === 409 || err.status === 507 ? "Submission refused:" : "Could not submit:";
       if (el.uploadDialog.open) showValidation(details, { title });
       else showToast(`Submission failed: ${details[0]}`, "error");
+      refreshSubmitState();
     }
   }
 
@@ -1247,8 +1212,8 @@
       section.querySelector(".ladder-sub").textContent = bench.sub;
       section.querySelector(".table-scroll").setAttribute("aria-label", `${bench.label} ladder table`);
       const btnUpload = section.querySelector(".ladder-upload");
-      btnUpload.textContent = `Upload to ${bench.label}`;
-      btnUpload.addEventListener("click", () => openUploadDialog(bench.key));
+      btnUpload.textContent = "Upload predictions";
+      btnUpload.addEventListener("click", () => openUploadDialog());
       const dom = {
         section,
         tbody: section.querySelector("tbody"),
@@ -1324,7 +1289,8 @@
   function wireEvents() {
     wireSort(el.overallTable.querySelectorAll("th[data-key]"), "overall", renderOverallTable);
 
-    el.btnOpenUpload.addEventListener("click", () => openUploadDialog(null));
+    el.btnOpenUpload.addEventListener("click", () => openUploadDialog());
+    el.nameInput.addEventListener("input", refreshSubmitState);
     el.btnCloseUpload.addEventListener("click", () => el.uploadDialog.close());
     el.btnCancelUpload.addEventListener("click", () => el.uploadDialog.close());
     el.btnSubmitUpload.addEventListener("click", submitPending);
@@ -1334,10 +1300,6 @@
       handleFile(file);
     });
     $("#upload-form").addEventListener("submit", (e) => e.preventDefault());
-    el.benchChooser.addEventListener("change", (e) => {
-      const choice = e.target && e.target.value;
-      if (choice && state.pendingFile) runValidation(state.pendingFile.name, state.pendingFile.text, choice);
-    });
 
     ["dragenter", "dragover"].forEach((ev) => el.dropzone.addEventListener(ev, (e) => {
       e.preventDefault(); el.dropzone.classList.add("dragover");
@@ -1386,5 +1348,5 @@
   }
 
   // exposed for debugging / tests in the console
-  window.Leaderboard = { parseSubmissionFile, validateEntry, computeRanks, overallStandings, plotLayout, placeLabels, CONFIG };
+  window.Leaderboard = { parseSubmissionFile, computeRanks, overallStandings, plotLayout, placeLabels, CONFIG };
 })();

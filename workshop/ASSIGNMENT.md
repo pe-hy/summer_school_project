@@ -23,7 +23,7 @@ Per benchmark, in `benchmark_a/` and `benchmark_b/`:
 |---|---|
 | `pool.tsv` | training messages, one per line, without labels |
 | `intents.txt` | the category names, one per line |
-| `test.tsv` | the evaluation messages with their correct categories |
+| `test.tsv` | the messages you are graded on, without categories |
 
 [Download the data](/data/benchmarks.zip)
 
@@ -40,22 +40,42 @@ Two rules:
 2. `test.tsv` is only for measuring. Never train on it and never let your
    labeling pipeline see it.
 
+You have no labels for `test.tsv` and you never will. Hold out part of the pool
+as your own validation set.
+
 ## What counts
 
-Two numbers per benchmark, measured by you on the test set:
+- **Accuracy**: we score it. You upload a category for every message in
+  `test.tsv` and the site checks it against the answer key.
+- **Average time per example**: you measure it. Load your model first, then
+  classify the test messages one at a time and divide the total time by their
+  count. Report the milliseconds. Run this on a Colab T4 so the numbers are
+  comparable.
 
-- **Accuracy**: the fraction of test messages your system gets right (0 to 1).
-- **Average time per example**: milliseconds per message. Load your model first,
-  then time the classification of the test messages one at a time and divide by
-  their count. Everything runs on a Colab T4, so the numbers are comparable.
+When your system classifies, it runs locally: no API calls and no network access
+at that point. Use the LLM to label the pool beforehand, then train something of
+your own that stands on its own.
 
 ## The leaderboard
 
-Upload one file, CSV or JSON, with one row per benchmark. Templates and a guide
-are on the site. Re-upload to update. You can submit the benchmarks separately
-or together.
+Upload one file, CSV or JSON, with three columns: `benchmark`, `id`, `intent`.
+One row for every message in `test.tsv`, for each benchmark you enter. Both
+benchmarks can go in the same file.
+
+```csv
+benchmark,id,intent
+A,1,card_arrival
+A,2,lost_card
+B,1,translate
+```
+
+You type your name and your milliseconds per message when you upload. Re-upload
+as often as you like.
 
 Ladders rank by accuracy. The overall standing is the average of your two
 accuracies. A skipped benchmark counts as 0.
+
+The board scores you on part of the test set. The final ranking uses the part it
+does not show you, so tuning against the leaderboard buys you nothing.
 
 [Open the leaderboard](/)

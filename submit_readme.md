@@ -1,56 +1,65 @@
-# Submitting your results to the leaderboard
+# Submitting to the leaderboard
 
-There are two benchmarks, A and B, each with its own ladder (see the
-[assignment](/assignment)). Upload with the **Upload results** button: either one
-combined file with both results, or one file per benchmark. Uploading again only
-replaces the benchmarks contained in the file.
+You upload **predictions**, not scores. The site checks them against the answer
+key and puts the accuracy on the ladder.
 
-## Required fields, one row/object per benchmark
+## The file
 
-| Field          | Type                 | Meaning                                          |
-|----------------|----------------------|--------------------------------------------------|
-| `name`         | text, max 80 chars   | your name (identical in both entries)            |
-| `benchmark`    | `"A"` or `"B"`       | which benchmark this result belongs to           |
-| `metric`       | number, 0–1          | top-1 accuracy as a fraction (e.g. `0.9312`)     |
-| `latency_ms`   | number, ≥ 0          | mean **milliseconds per example** on the test set (Colab T4) |
+One row per test message, in CSV or JSON, with three fields:
 
-- No other fields are allowed; numbers use a dot as the decimal separator.
-- One file may contain one or two results, never two for the same benchmark.
-- Ladders rank by accuracy. The overall standing is the average of your two
-  accuracies (a missing benchmark counts as 0).
+| Field       | Meaning                                              |
+|-------------|------------------------------------------------------|
+| `benchmark` | `A` or `B`                                           |
+| `id`        | the id from that benchmark's `test.tsv`              |
+| `intent`    | the category you predict, spelled as in `intents.txt` |
 
-## CSV format (one or two data rows)
+Rules:
+
+- One row for **every** message in `test.tsv`: 3,080 rows for A, 4,500 for B.
+- Both benchmarks can go in one file, or upload them separately.
+- Each id appears once per benchmark.
 
 ```csv
-name,benchmark,metric,latency_ms
-Jane Doe,A,0.9312,1.37
-Jane Doe,B,0.9698,24.35
+benchmark,id,intent
+A,1,card_arrival
+A,2,lost_card
+B,1,translate
 ```
 
-## JSON format (one object, or an array with one per benchmark)
+JSON is the same thing as a list of objects:
 
 ```json
 [
-  { "name": "Jane Doe", "benchmark": "A", "metric": 0.9312, "latency_ms": 1.37 },
-  { "name": "Jane Doe", "benchmark": "B", "metric": 0.9698, "latency_ms": 24.35 }
+  { "benchmark": "A", "id": 1, "intent": "card_arrival" },
+  { "benchmark": "B", "id": 1, "intent": "translate" }
 ]
 ```
 
-Templates: [`submission.csv`](examples/submission.csv) · [`submission.json`](examples/submission.json).
+Templates: [`predictions.csv`](examples/predictions.csv) · [`predictions.json`](examples/predictions.json).
 
-## Editing or deleting
+## When you upload
 
-Your browser remembers your uploads (no account needed). In the **same browser** you can
-re-upload to replace a result, or delete per benchmark / everything. If you switch
-browsers or clear site data, ask an organiser.
+The dialog asks for two things the file does not carry:
 
-Each `name` can appear only once per benchmark. If your upload is refused with
-*"a submission for … already exists"*, it was either your own earlier upload from
-another browser or a namesake. Either way, ask an organiser.
+- **Your name**, as it should appear on the board.
+- **Milliseconds per message**, the speed you measured on a Colab T4.
+
+Press Submit and the site tells you your accuracy straight away.
+
+## Editing and deleting
+
+Your browser remembers your uploads, so you can re-upload as often as you like;
+a new file replaces the benchmarks it contains. You can also delete either
+benchmark. Switching browsers loses that link, so ask an organiser.
+
+Each name appears once per benchmark. If your upload is refused with
+*"a submission under this name already exists"*, it was either you from another
+browser or a namesake. Either way, ask an organiser.
 
 ## Common mistakes
 
-- Accuracy as a percentage (`93.12`): submit the fraction (`0.9312`).
-- Latency in seconds: submit milliseconds per example.
-- Two rows with the same `benchmark`, or different `name`s in one file.
-- Extra or misspelt fields (`score`, `avg_time_s` are not accepted).
+- Missing rows. Predict every message in `test.tsv`, not a sample.
+- Categories that are not in `intents.txt`, or reformatted (`Card Arrival`
+  instead of `card_arrival`).
+- Mixing up the ids: `id` comes from `test.tsv`, not from `pool.tsv`.
+- Latency in seconds. Report milliseconds per message.

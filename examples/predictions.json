@@ -1,0 +1,22 @@
+[
+  {
+    "benchmark": "A",
+    "id": 1,
+    "intent": "activate_my_card"
+  },
+  {
+    "benchmark": "A",
+    "id": 2,
+    "intent": "age_limit"
+  },
+  {
+    "benchmark": "B",
+    "id": 1,
+    "intent": "accept_reservations"
+  },
+  {
+    "benchmark": "B",
+    "id": 2,
+    "intent": "account_blocked"
+  }
+]

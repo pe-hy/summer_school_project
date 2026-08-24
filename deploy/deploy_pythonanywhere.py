@@ -40,7 +40,9 @@ UPLOAD = [  # (directory or file relative to ROOT, recursive)
     "app.py", "submit_readme.md", "README.md", "requirements.txt", "seed_demo.py",
     "static", "examples", "vendor",
     "workshop/ASSIGNMENT.md",        # ONLY this file from workshop/, instructor notes must never ship
-    "workshop/data/benchmark_a", "workshop/data/benchmark_b",   # never workshop/data/_instructor
+    "workshop/data/benchmark_a", "workshop/data/benchmark_b",
+    # the answer keys: needed on the server to score, never served to anyone
+    "workshop/data/_instructor/test_labels_a.tsv", "workshop/data/_instructor/test_labels_b.tsv",
 ]
 SKIP_DIRS = {"__pycache__", ".git", "node_modules", "_instructor"}
 

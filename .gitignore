@@ -13,3 +13,8 @@ deploy/.pa_token
 workshop/INSTRUCTOR_NOTES.md
 # answer key for the unlabeled pool (instructor only)
 workshop/data/_instructor/
+# instructor-only: names the source corpora / links to the original labels
+workshop/data/README.md
+scripts/build_data.py
+# instructor-only: Haiku labels for pool messages (a partial answer key) + the baseline
+workshop/baseline/

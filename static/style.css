@@ -414,18 +414,25 @@ td.num.missing { color: var(--line-strong); }
 
 /* ---------- upload dialog additions ---------- */
 .validation.warn { background: var(--amber-tint); border-color: #f3d89a; color: var(--amber-ink); }
-.bench-chooser[hidden] { display: none; }
-.bench-chooser {
+.name-field { display: flex; flex-direction: column; gap: .3rem; font-size: .9rem; color: var(--ink-muted); }
+.name-field input {
+  font: inherit;
+  color: var(--ink);
+  padding: .5rem .7rem;
   border: 1px solid var(--line-strong);
   border-radius: 8px;
-  padding: .6rem .9rem;
-  display: flex;
-  gap: 1.2rem;
-  align-items: center;
-  font-size: .92rem;
+  background: var(--surface);
 }
-.bench-chooser legend { padding: 0 .3rem; color: var(--ink-muted); font-size: .85rem; }
-.bench-chooser label { display: inline-flex; gap: .35rem; align-items: center; cursor: pointer; }
+.name-field input:focus-visible, .latency-input:focus-visible { outline: 3px solid transparent; box-shadow: var(--focus-ring); }
+.latency-input {
+  font: inherit;
+  width: 7rem;
+  padding: .3rem .5rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.latency-unit { color: var(--ink-muted); font-size: .85rem; margin-left: .4rem; }
 .preview-row { border: 1px solid var(--line); border-radius: 8px; padding: .6rem .9rem; margin-top: .5rem; }
 .preview-row h4 { margin: 0 0 .4rem; font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: var(--teal-ink); }
 .preview-row:nth-child(2) h4 { color: var(--blue); }
