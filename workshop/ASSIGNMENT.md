@@ -69,22 +69,15 @@ your own that stands on its own.
 
 ## The leaderboard
 
-Upload one file, CSV or JSON, carrying your name, your measured speed, and a
-category for every message in `test.tsv`. Both benchmarks can go in one file.
-
-```csv
-name,benchmark,average_time_per_example,id,intent
-Jane Doe,A,7.02,1,card_arrival
-Jane Doe,A,7.02,2,lost_card
-Jane Doe,B,7.51,1,translate
-```
-
-In JSON, the predictions nest under each benchmark:
+Upload one JSON file with your name, how fast your system ran, and a category
+for every message in `test.tsv`. Both benchmarks go in the same file.
 
 ```json
 [
   { "name": "Jane Doe", "benchmark": "A", "average_time_per_example": 7.02,
-    "predictions": [{ "id": 1, "intent": "card_arrival" }] }
+    "predictions": [{ "id": 1, "intent": "card_arrival" }] },
+  { "name": "Jane Doe", "benchmark": "B", "average_time_per_example": 7.51,
+    "predictions": [{ "id": 1, "intent": "translate" }] }
 ]
 ```
 

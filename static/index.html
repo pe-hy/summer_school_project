@@ -107,8 +107,6 @@
       <span class="footer-sep" aria-hidden="true">·</span>
       <a href="/data/benchmarks.zip">data</a>
       <span class="footer-sep" aria-hidden="true">·</span>
-      <a href="/examples/predictions.csv">predictions.csv</a>
-      <span class="footer-sep" aria-hidden="true">·</span>
       <a href="/examples/predictions.json">predictions.json</a>
     </div>
   </footer>
@@ -178,13 +176,12 @@
       </header>
 
       <p class="dialog-hint">
-        One row per test message, with the columns
-        <code>name, benchmark, average_time_per_example, id, intent</code>.
-        Both benchmarks can go in the same file. The site scores it against the answer key.
-        Templates: <a href="/examples/predictions.csv">CSV</a> · <a href="/examples/predictions.json">JSON</a>
+        One JSON file with your name, your measured speed, and a category for every
+        message in <code>test.tsv</code>. Both benchmarks go in the same file, and the
+        site scores it against the answer key.
+        Template: <a href="/examples/predictions.json">predictions.json</a>
         · <a href="/guide" target="_blank" rel="noopener">guide</a>
-        · <a href="/assignment" target="_blank" rel="noopener">assignment</a>.
-      </p>
+        · <a href="/assignment" target="_blank" rel="noopener">assignment</a>.      </p>
 
       <label class="dropzone" id="dropzone" for="file-input">
         <input type="file" id="file-input" class="visually-hidden" accept=".csv,.json,text/csv,application/json">
