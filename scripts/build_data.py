@@ -28,8 +28,14 @@ def fetch(url: str) -> bytes:
 
 
 def clean(text: str) -> str:
-    """One message per line: collapse whitespace, drop tabs/newlines."""
-    return " ".join(str(text).split())
+    """One message per line, and parseable by every TSV reader.
+
+    Whitespace (tabs, newlines) is collapsed, and the double-quote character is
+    replaced by an apostrophe: a field that starts with a quote makes pandas and
+    csv.reader treat it as an opening quote and swallow the following rows. 93
+    of ~35,500 messages are affected and their meaning is unchanged.
+    """
+    return " ".join(str(text).replace('"', "'").split())
 
 
 def write_benchmark(key: str, pool: list[tuple[str, str]], test: list[tuple[str, str]], intents: list[str]) -> dict:

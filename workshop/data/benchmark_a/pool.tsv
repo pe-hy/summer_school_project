@@ -52,7 +52,7 @@ id	text
 51	Why, when paying with the card, was I charged an extra fee?
 52	Why can't my transfer complete?
 53	It won't let me activate my card.
-54	What do I do with my "decline" message on a transfer?
+54	What do I do with my 'decline' message on a transfer?
 55	Can I have it delivered on the date I need it delivered?
 56	I purchased something abroad and the incorrect exchange rate was applied.
 57	I was overcharged at an ATM while on vacation. I needed cash so I had to use it, but your charges are outregous and I wish I would have known beforehand.
@@ -170,7 +170,7 @@ id	text
 169	I see an extra $1 charge on my statement, why is this?
 170	Why would the app show a withdrawal that I did not make?
 171	How much do I have to pay to accept an international transfer?
-172	Hello. How long does it usually take to transfer money to another country? I've made sure all the information is correct, but the transfer still says that it's "pending."
+172	Hello. How long does it usually take to transfer money to another country? I've made sure all the information is correct, but the transfer still says that it's 'pending.'
 173	Where is the cash I deposited?
 174	What do I need to do to get my new card which I have requested 2 weeks ago?
 175	Can I link my card I previously received?
@@ -260,7 +260,7 @@ id	text
 259	I'm trying to verify my identity but can't figure out how, what do I do?
 260	I cannot seem to buy something online with my card? the payment comes back, what's going on?
 261	is there a way to fix my top up
-262	I am having trouble doing a transfer. A "Decline " message appears after making the transfer.
+262	I am having trouble doing a transfer. A 'Decline ' message appears after making the transfer.
 263	Do I need a disposable card?
 264	How long will I have to wait for my new card?
 265	How long do money transfers take? My friend really needs the money i sent a couple of hours ago but it's not there yet.
@@ -2520,7 +2520,7 @@ id	text
 2519	I made a transfer and the person I transferred the money to didn't receive the right amount? Why did this happen and how do I get the rest of the money to them?
 2520	My card doesn't work. I can't get cash out at an ATM
 2521	Is it possible to get one the your cards in the EU?
-2522	I received a "declined" message when doing a transfer
+2522	I received a 'declined' message when doing a transfer
 2523	What fiat currencies are used for holdings?
 2524	What does it cost to receive a SEPA transfer?
 2525	I have enough money in my account, so why is my card being declined?
@@ -2579,7 +2579,7 @@ id	text
 2578	I have a transfer that was approved that I'm urgently waiting for. How long am I supposed to wait for it?
 2579	I recently made a transfer that I would like to cancel
 2580	Changed details is essential, what steps do I take to do so?
-2581	I'm pretty frustrated about a pound charge that keeps showing up in my account statement. It's listed in the app as "pending", it never changes, and now I'm thinking someone's hacked my account!
+2581	I'm pretty frustrated about a pound charge that keeps showing up in my account statement. It's listed in the app as 'pending', it never changes, and now I'm thinking someone's hacked my account!
 2582	Do currency exchanges cost extra?
 2583	I had everything lined up to make a transfer, and then it rejected it.
 2584	I think someone stole money from my card
@@ -2724,7 +2724,7 @@ id	text
 2723	I lost my passcode.
 2724	Where do I go to activate my card?
 2725	I need a Visa card
-2726	How long does the "pending" period of a transfer take?
+2726	How long does the 'pending' period of a transfer take?
 2727	Money that I have transferred hasn't arrived yet
 2728	Why have I received a rebate for my payment after a week?
 2729	I wanted to top up my account and it doesn't look like it worked
@@ -2930,7 +2930,7 @@ id	text
 2929	I need my refund as soon as possible. What else do I have to do?
 2930	My identity has been stolen. I still have my physical card but there are charges I didn't make on my account. How do I cancel this card or dispute the charges?
 2931	I transferred some money to my mom 2 days ago and she has not received it. I double checked the information and it looks right. Can you help me?
-2932	I initiated a payment a while ago and it is still showing as "pending", how long will it take to clear?
+2932	I initiated a payment a while ago and it is still showing as 'pending', how long will it take to clear?
 2933	I'm still expecting the transaction to be finished
 2934	Someone mugged my and stole everything. I can't use the app. What should I do?
 2935	What is the procedure for activating this card?
@@ -3035,7 +3035,7 @@ id	text
 3034	I must verify the source of my funds
 3035	Why can't I use my card?
 3036	Which currencies do you accept for adding money?
-3037	Hi, is everything in good standing with my card? I am receiving multiple "decline" messages.
+3037	Hi, is everything in good standing with my card? I am receiving multiple 'decline' messages.
 3038	There seems to be an additional charge of £1 on my statement, what is the reason for this?
 3039	What is the point of verifying a top up?
 3040	Why was my withdrawal requested cancelled by the ATM?
@@ -3379,7 +3379,7 @@ id	text
 3378	How many times can I auto top-up?
 3379	Can the card be mailed to Europe?
 3380	Please give me both Visa and MasterCard, is it possible?
-3381	I made a transfer and according to the receiver "they haven't received the right amount" Its lesser than it should be.Now I have to transfer more money to make up for the missing amount . Can you please help me about this,what should be done
+3381	I made a transfer and according to the receiver 'they haven't received the right amount' Its lesser than it should be.Now I have to transfer more money to make up for the missing amount . Can you please help me about this,what should be done
 3382	What is the refund procedure?
 3383	What is limit of disposable cards I can make per day?
 3384	I see a direct debit transaction in my history that I did not set up.
@@ -3457,7 +3457,7 @@ id	text
 3456	Can you tell me why a cheque deposit isn't showing in my balance?
 3457	I didn't withdraw the amount of cash that is showing up in the app.
 3458	I am from X but am traveling to Y - how do I get currency for Y?
-3459	I get a "decline" message when doing a transfer
+3459	I get a 'decline' message when doing a transfer
 3460	How do I locate my PIN now that I have my card?
 3461	Is it possible to exchange USD and GBP on the app?
 3462	Can cards be delivered? Where?
@@ -3734,7 +3734,7 @@ id	text
 3733	What is the current exchange fee?
 3734	Can I change my PIN at my local bank?
 3735	I tried to transfer money to a receiver and they didn't get the right amount. What is going on and who do I contact to help me?
-3736	Hi, I had an issue with my card payment and It shows on my account that my payment went through. Then I got contacted from the seller saying "they did not receive my payment" then the payment was returned to my account. so I would like to see why it did that please.
+3736	Hi, I had an issue with my card payment and It shows on my account that my payment went through. Then I got contacted from the seller saying 'they did not receive my payment' then the payment was returned to my account. so I would like to see why it did that please.
 3737	I want to do a bank transfer to this bank, from an account at another bank.
 3738	For a week now, I have tried to use my card and it is still not working.
 3739	How do I exchange currencies using this app?
@@ -4172,7 +4172,7 @@ id	text
 4171	I want to transfer money from another account into this one.
 4172	I recently purchased something, and the exchange rate was wrong.
 4173	I need to renew a card that's about to expire
-4174	I put in a payment a while ago and it has still not cleared and is showing up as "pending", how long does it take to clear?
+4174	I put in a payment a while ago and it has still not cleared and is showing up as 'pending', how long does it take to clear?
 4175	I don't know my password anymore.
 4176	Hi I am trying to transfer money to another country but it is showing pending and it has been a long time. I have checked numbers and they are correct. Could you please help?
 4177	Please check to see if the band transfer I made a while ago from my UK account has safely arrived.
@@ -5468,7 +5468,7 @@ id	text
 5467	Is it possible to top up by card?
 5468	When I tried to access my cash, I wasn't allowed!
 5469	How can I add a new card?
-5470	My husband and I went out for our weekly "dinner and a movie," and it was my turn to pick up the check. Now I see that my card was charged twice. Who should I contact about negating the second charge and getting my card credited?
+5470	My husband and I went out for our weekly 'dinner and a movie,' and it was my turn to pick up the check. Now I see that my card was charged twice. Who should I contact about negating the second charge and getting my card credited?
 5471	Why would I receive an error that my transfer isn't possible when I've done it before?
 5472	what is this extra charge with my purchase?
 5473	Can I use my apple watch to top up?
@@ -5794,7 +5794,7 @@ id	text
 5793	I thought it was free to make a withdrawal. So how much does it cost now?
 5794	Can you find out why my credit card didn't process payment? It was declined for top up so what's the deal?
 5795	Is payment required to get a card of my own?
-5796	It says "pending payment?" Why is it saying this?
+5796	It says 'pending payment?' Why is it saying this?
 5797	Verify top-up card help?
 5798	Can you elaborate on why I have an extra charge just for transferring?
 5799	Is there a reason for my top up to be cancelled?
@@ -6107,7 +6107,7 @@ id	text
 6106	I used the ATM to get money out and did not realize I would be charged as much as I was or I would not have done that!
 6107	Am I limited to what ATM I can use my card?
 6108	How long does it take for a transfer to show up in my account?
-6109	I made a payment a while ago and it is still showing as "pending" in the account. How long will this payment take to complete?
+6109	I made a payment a while ago and it is still showing as 'pending' in the account. How long will this payment take to complete?
 6110	How much is the exchange fee?
 6111	I made a cash deposit going to my account but it is not there
 6112	Why is there a charge for my transfer?
@@ -6289,7 +6289,7 @@ id	text
 6288	I forgot my code
 6289	Why am I charged a fee when using my debit or credit card?
 6290	I hope you can help me. My account has been compromised from a different town that I haven't been to. Can you please place a hold on my account until I can make it to the bank?
-6291	I made a transfer and according to the receiver "they haven't received the right amount" Its lesser than it should be.Now I have to transfer more money to make up for the missing amount . Can you please help me about this, what should be done ?
+6291	I made a transfer and according to the receiver 'they haven't received the right amount' Its lesser than it should be.Now I have to transfer more money to make up for the missing amount . Can you please help me about this, what should be done ?
 6292	Can you lookup my password?
 6293	I got married and need to change my name.
 6294	Can I top up for free using a European card?
@@ -7504,7 +7504,7 @@ id	text
 7503	An ATM machine didn't give me back my card.
 7504	Why isn't this accepting my identity?
 7505	I wish to cancel a transfer
-7506	What does it mean when a transfer is "pending"?
+7506	What does it mean when a transfer is 'pending'?
 7507	What's the deal with verifying the top-up?
 7508	what is the most money i can top up?
 7509	I did a transfer to my account, but it hasn't shown up
@@ -7603,7 +7603,7 @@ id	text
 7602	Can I electronically transfer funds into my account from my American Express?
 7603	I can't see all the refunds in my statement
 7604	I did not receive my full withdrawal amount
-7605	After I make a payment, how long will it be before it transitions from "pending" to complete?
+7605	After I make a payment, how long will it be before it transitions from 'pending' to complete?
 7606	I asked for a certain amount of money from the ATM, but it gave me a different amount. Less than what I asked for.
 7607	how much to get my card in 2 days?
 7608	How can I prove the source of my funds?
@@ -8218,7 +8218,7 @@ id	text
 8217	has my card payment been reverted?
 8218	How do I initiated a bank transfer to top up?
 8219	How come my transfer got declined
-8220	Why is my transfer appearing as "pending"?
+8220	Why is my transfer appearing as 'pending'?
 8221	It appears my transfer was declined.
 8222	Can I get a refund?
 8223	How do I know which countries you provide service in?
@@ -8782,7 +8782,7 @@ id	text
 8781	I just had a wedding and I want to take my spouses name.
 8782	Why does a cash withdrawal show as pending?
 8783	My transfer is stuck pending? How do we fix it to it goes through?
-8784	I was doing a transfer and received a "decline" message.
+8784	I was doing a transfer and received a 'decline' message.
 8785	My card payment was reverted
 8786	I don't know where my phone is.
 8787	Was I charged more than I should of been for a currency exchange?
@@ -9544,7 +9544,7 @@ id	text
 9543	are there any exchange fees
 9544	How long will a transfer from the US take?
 9545	I have a transaction showing up more than once.
-9546	On my transfer there was a "decline" message
+9546	On my transfer there was a 'decline' message
 9547	I tempted to get some money out of the machine earlier and it did not work.Looking now, the transaction actually shows to still be in progress. I would certainly appreciate someone look into this and let me know what's going on. I definitely do not want to be charged for money I never received.
 9548	My card is going to expire, what do I do?
 9549	I see in the app some cash was withdrawn, but it's not mine.

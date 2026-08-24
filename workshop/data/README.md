@@ -19,7 +19,7 @@ Notes:
 
 - Ids are positions after shuffling with a fixed seed, so ordering carries no signal.
   Re-running the build script reproduces the files byte for byte.
-- BANKING77 ships one label with an odd capital (`Refund_not_showing_up`); it is
+- BANKING77 ships one label with an odd capital (`refund_not_showing_up`); it is
   lowercased here so the category names are consistent.
 - A handful of messages appear in both pool and test (7 in A, 1 in B). That is in
   the original corpora and is left as is.

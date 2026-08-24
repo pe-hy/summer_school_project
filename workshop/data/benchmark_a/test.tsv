@@ -187,7 +187,7 @@ id	text	intent
 186	Is it possible to have both a Visa and a Mastercard from you?	visa_or_mastercard
 187	Will it automatically top-up or do I need to do that manually if there isn't much cash left?	automatic_top_up
 188	My child needs a card, how can I add them to the account I currently have?	getting_spare_card
-189	Where can I find the "auto-top" feature?	automatic_top_up
+189	Where can I find the 'auto-top' feature?	automatic_top_up
 190	Can you tell me the foreign exchange rate?	exchange_rate
 191	Should I expect to be charged for topping up by transfer?	top_up_by_bank_transfer_charge
 192	Why was my cash withdrawal declined?	declined_cash_withdrawal
@@ -284,7 +284,7 @@ id	text	intent
 283	How can I top up my account with a card?	topping_up_by_card
 284	Somebody has stolen my card, I need help please.	lost_or_stolen_card
 285	My daughter would like a card as well, how can we make this happen?	getting_spare_card
-286	Is there something wrong with your website? I tried topping up my account and it's been close to two hours now and it's still at "pending" for some reason. I just joined with you guys and this is the first attempt at this, so maybe I'm wrong, but shouldn't this be instant?	pending_top_up
+286	Is there something wrong with your website? I tried topping up my account and it's been close to two hours now and it's still at 'pending' for some reason. I just joined with you guys and this is the first attempt at this, so maybe I'm wrong, but shouldn't this be instant?	pending_top_up
 287	How can I fix a problem where contactless isn't working?	contactless_not_working
 288	Why didn't my balance change after I transferred some money?	balance_not_updated_after_bank_transfer
 289	I want to top up using cash, where can I do that?	top_up_by_cash_or_cheque
@@ -316,7 +316,7 @@ id	text	intent
 315	Why did I not get my cash back after I withdrew?	wrong_amount_of_cash_received
 316	I need a new Pin how do I go about that?	change_pin
 317	I can't prove my identity.	unable_to_verify_identity
-318	I recently made a payment, and it is showing up in my account as "pending". What does that mean?	pending_card_payment
+318	I recently made a payment, and it is showing up in my account as 'pending'. What does that mean?	pending_card_payment
 319	Why were there additional charges when transferring?	transfer_fee_charged
 320	I need to update my info.	edit_personal_details
 321	I need help getting the virtual card to work.	virtual_card_not_working
@@ -473,7 +473,7 @@ id	text	intent
 472	What is the reason for this fee I got after a simple cash withdrawal?	cash_withdrawal_charge
 473	I have to have several disposable cards per day.	disposable_card_limits
 474	Is there a charge for a foreign currency exchange?	exchange_charge
-475	What do I do if an ATM "stole" my card?	card_swallowed
+475	What do I do if an ATM 'stole' my card?	card_swallowed
 476	I want this amount reversed out of my account.	request_refund
 477	I tried to use my card to top up but all of the money has disappeared.	topping_up_by_card
 478	How can i get multiple disposble cards.	disposable_card_limits
@@ -1432,7 +1432,7 @@ id	text	intent
 1431	Where do I go if I want to link my new card?	card_linking
 1432	I would appreciate it if I could get an item refunded	request_refund
 1433	Can I get a card outside the UK?	country_support
-1434	Can you help me with a weird charge? It's a pound charge that never goes away from the statement view on the app I'm using. It's not described as anything but "Pending", and that status has never changed during the last two days.	extra_charge_on_statement
+1434	Can you help me with a weird charge? It's a pound charge that never goes away from the statement view on the app I'm using. It's not described as anything but 'Pending', and that status has never changed during the last two days.	extra_charge_on_statement
 1435	What do I do if the ATM ate my card?	card_swallowed
 1436	How do I unblock my card using the app?	card_not_working
 1437	Could you help me reactivate my card? It was previously lost, but I found it this morning in my jacket.	card_linking
@@ -1609,7 +1609,7 @@ id	text	intent
 1608	How do I report my card lost or stolen?	lost_or_stolen_card
 1609	What countries are supported?	country_support
 1610	Is there a fee for using a European bank card to top up?	top_up_by_card_charge
-1611	Why does my transfer say "pending"?	pending_transfer
+1611	Why does my transfer say 'pending'?	pending_transfer
 1612	Hi. I just withdrew cash from an ATM and received the wrong amount. However, my app shows the correct amount I withdrew. How do I get the rest of the cash?	wrong_amount_of_cash_received
 1613	I don't know where this transaction came from?	card_payment_not_recognised
 1614	I do not see a top-up processed.	pending_top_up
@@ -1938,7 +1938,7 @@ id	text	intent
 1937	I tried using my card today and it's not working, can you help me?	card_not_working
 1938	I need to find out what is the limit for top-ups.	top_up_limits
 1939	How many disposable cards can I own?	disposable_card_limits
-1940	I was double charged, and the second charge is showing as "pending". How long will it be before I get my money back once the second charge has been refunded?	pending_card_payment
+1940	I was double charged, and the second charge is showing as 'pending'. How long will it be before I get my money back once the second charge has been refunded?	pending_card_payment
 1941	I forgot my password	passcode_forgotten
 1942	Where is the transfer I started?	transfer_not_received_by_recipient
 1943	What is the auto top up function and where can I find that at?	automatic_top_up
@@ -2958,7 +2958,7 @@ id	text	intent
 2957	Is there a specific type you need for identity verification?	verify_my_identity
 2958	How many transactions can I do with one disposable card?	disposable_card_limits
 2959	What is the fastest that I can make a transfer?	transfer_timing
-2960	Hi. I'm a new customer to your system and I think something isn't working right - or maybe it is. Maybe you can confirm. I tried to top up today (my first time ever) and it's been stuck at "pending" for over an hour now. Is it supposed to do this or is there something wrong in the system?	pending_top_up
+2960	Hi. I'm a new customer to your system and I think something isn't working right - or maybe it is. Maybe you can confirm. I tried to top up today (my first time ever) and it's been stuck at 'pending' for over an hour now. Is it supposed to do this or is there something wrong in the system?	pending_top_up
 2961	Do you have a limit to top ups?	top_up_limits
 2962	Why is there a fee for withdrawing?	cash_withdrawal_charge
 2963	I tried to buy something online yesterday but it wouldn't stop saying declined. Tried again today but same thing happened. What's Broken?	declined_transfer

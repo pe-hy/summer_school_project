@@ -283,7 +283,7 @@ id	text	intent
 282	thanks for that answer	thank_you
 283	the temperature at ac is what	smart_home
 284	what's the spanish word for pasta	translate
-285	will you play the song that goes like, "starships were meant to fly	play_music
+285	will you play the song that goes like, 'starships were meant to fly	play_music
 286	name unusual facts about the circus	fun_fact
 287	what are the size limits regarding-carry on bags	carry_on
 288	do you know when our next day off is	next_holiday
@@ -291,7 +291,7 @@ id	text	intent
 290	are there any required shots in indonesia	vaccines
 291	get a table for me at 7 for 3 people at olive garden	restaurant_reservation
 292	i need you to switch the language you are responding in	change_language
-293	"which is the best way to improve the credit score	improve_credit_score
+293	'which is the best way to improve the credit score	improve_credit_score
 294	i'd like to set up direct deposit	direct_deposit
 295	please sync up with my phone	sync_device
 296	change name for me	change_user_name
@@ -636,7 +636,7 @@ id	text	intent
 635	figure out when my car will next need an oil change	oil_change_when
 636	add funds to the retirement account from the pnc account only	transfer
 637	is it okay to use applesauce instead of oil	ingredient_substitution
-638	i'd like to send a text to jack, say "hi	text
+638	i'd like to send a text to jack, say 'hi	text
 639	put together a list of instructions for me on how to change the oil in my car	oil_change_how
 640	tell me the current exchange rate between cad and euros	exchange_rate
 641	are there any holidays coming and when	next_holiday
@@ -747,7 +747,7 @@ id	text	intent
 746	state recent transaction	transactions
 747	set a reminder to buy bread	reminder_update
 748	how do i report my very lost card	report_lost_card
-749	text mike, "i'm running late	text
+749	text mike, 'i'm running late	text
 750	can you find me a salsa recipe	recipe
 751	what was the date of my last oil change	last_maintenance
 752	does mr joes pizza usually have a long wait	how_busy
@@ -805,7 +805,7 @@ id	text	intent
 804	give me today's date	date
 805	tell me what the gas mileage is on my car	mpg
 806	does osteria francescana take reservations	accept_reservations
-807	i need help spelling "exquisite	spelling
+807	i need help spelling 'exquisite	spelling
 808	would you consider someone else your boss	who_do_you_work_for
 809	my car needs a jump start; what do i need to do	jump_start
 810	i want to know the status of my vacation request	pto_request_status
@@ -1277,7 +1277,7 @@ id	text	intent
 1276	ai, what is your name	what_is_your_name
 1277	please mail me more checkbooks	order_checks
 1278	what's the food can easily get in canada	restaurant_suggestion
-1279	tell me how to spent "frightened	spelling
+1279	tell me how to spent 'frightened	spelling
 1280	i want my phone to be disconnected from you	sync_device
 1281	delete dentist from my calendar	calendar_update
 1282	give me some ideas of how to avoid my credit score lowering	improve_credit_score
@@ -1312,7 +1312,7 @@ id	text	intent
 1311	i would like to book a place to stay in phoenix from the 5th to the 9th of march	book_hotel
 1312	i didn't catch that	repeat
 1313	i want to know my credit rating	credit_score
-1314	"i'm going on a flight from lax and going to phl, which is only $120 on june 15th	book_flight
+1314	'i'm going on a flight from lax and going to phl, which is only $120 on june 15th	book_flight
 1315	can i redeem my points on gas	redeem_rewards
 1316	if you have hobbies tell me some of them	what_are_your_hobbies
 1317	ai answer my questions with my name first which is deb	change_user_name
@@ -1320,7 +1320,7 @@ id	text	intent
 1319	find a decent rental care for next week at the philadelphia airport	car_rental
 1320	now tell me my credit card's apr	apr
 1321	can you cancel that, please	cancel
-1322	let's try and confirm my reservation for bubble bar under "franklin	confirm_reservation
+1322	let's try and confirm my reservation for bubble bar under 'franklin	confirm_reservation
 1323	do you have any idea if central needs reservations	accept_reservations
 1324	what ingredients do i use for pork belly	ingredients_list
 1325	how much of a credit limit does visa allow	credit_limit
@@ -1744,7 +1744,7 @@ id	text	intent
 1743	do i require a plug converter when i visit puerto rico	plug_type
 1744	find square root of 453	calculator
 1745	i want to change your name to shelby	change_ai_name
-1746	the song that goes, "starships were meant to fly", play it	play_music
+1746	the song that goes, 'starships were meant to fly', play it	play_music
 1747	where the bleep did i put my bleeping phone	find_phone
 1748	where do i go to order more checks for my well's fargo account	order_checks
 1749	please confirm my reservation for bar les freres at 7	confirm_reservation
@@ -2022,7 +2022,7 @@ id	text	intent
 2021	my visa has what limit	credit_limit
 2022	how do i put in a vacation request	pto_request
 2023	when is my electricity due date	bill_due
-2024	how do you spell "montpelier	spelling
+2024	how do you spell 'montpelier	spelling
 2025	can you find me a rice recipe	recipe
 2026	how do i say i'm sorry in chinese	translate
 2027	i have used how much pto so far	pto_used
@@ -2104,7 +2104,7 @@ id	text	intent
 2103	i need a table at gemma for nine at two	restaurant_reservation
 2104	how many hours of pto have i used	pto_used
 2105	can you see if i can make an appointment to have my oil changed	schedule_maintenance
-2106	play the song that goes, "starships were meant to fly	play_music
+2106	play the song that goes, 'starships were meant to fly	play_music
 2107	would you give me examples of what some of your hobbies are	what_are_your_hobbies
 2108	am i almost due for a tire change	tire_change
 2109	tell me what to make for dinner	meal_suggestion
@@ -2156,7 +2156,7 @@ id	text	intent
 2155	what steps do i need to follow to jump start my car	jump_start
 2156	today is which day of the week	date
 2157	where am i currently located	current_location
-2158	can you spell "fragile" for me	spelling
+2158	can you spell 'fragile' for me	spelling
 2159	do i have any meetings between 1 and 8 pm	meeting_schedule
 2160	is there a travel alert for france	travel_alert
 2161	tell me something interesting about bees	fun_fact
@@ -2221,7 +2221,7 @@ id	text	intent
 2220	it is good to see you	greeting
 2221	you take sweeping of my todo list	todo_list_update
 2222	i'm looking for a flight from billings to cleveland on may 2 and a return on may 9	book_flight
-2223	can you play the song that goes like, "starships were meant to fly	play_music
+2223	can you play the song that goes like, 'starships were meant to fly	play_music
 2224	how do i adjust my credit limit	credit_limit_change
 2225	did i get my car inspected recently	last_maintenance
 2226	i will say yes as my response	yes
@@ -2374,7 +2374,7 @@ id	text	intent
 2373	20 yen is how many dollars	exchange_rate
 2374	what are people saying about chick-fil-a's chicken nuggets	restaurant_reviews
 2375	does the state department say anything about traveling to haiti	travel_alert
-2376	is "cleaning the bathroom" an item on my todo list	todo_list
+2376	is 'cleaning the bathroom' an item on my todo list	todo_list
 2377	book me an uber for a party of 5 to the salvage yard off maple	uber
 2378	i need to know the name that you have for me	user_name
 2379	would vaccinations be needed if i go here	vaccines
@@ -2453,8 +2453,8 @@ id	text	intent
 2452	what is the process for reporting my card as lost	report_lost_card
 2453	what have i spent on food this month	spending_history
 2454	what does the gas meter read	gas
-2455	what's the proper way to spell "helicopter	spelling
-2456	can you spell out "annulment	spelling
+2455	what's the proper way to spell 'helicopter	spelling
+2456	can you spell out 'annulment	spelling
 2457	i would like to know who your boss is	who_do_you_work_for
 2458	how many miles are my tires rated for	tire_change
 2459	my capital one visa was taken without permission	report_lost_card
@@ -2485,7 +2485,7 @@ id	text	intent
 2484	5 people are going to be at tropicana by 8pm, reserve the table under martins name please	restaurant_reservation
 2485	how do i order more checkbooks for my well's fargo account	order_checks
 2486	what is your preferred name	what_is_your_name
-2487	"where is improve the credit score	improve_credit_score
+2487	'where is improve the credit score	improve_credit_score
 2488	find out what song is currently on the speakers	what_song
 2489	does the ai have hobbies	what_are_your_hobbies
 2490	confirm my reservation for joe at hoss's	confirm_reservation
@@ -2535,7 +2535,7 @@ id	text	intent
 2534	how about i call you sue	change_ai_name
 2535	when will i hear back about my days off	pto_request_status
 2536	cancel doctors appointment from my calendar	calendar_update
-2537	i need to know how to spell "miranda	spelling
+2537	i need to know how to spell 'miranda	spelling
 2538	what do my vacation days amount to	pto_balance
 2539	what do you call me	user_name
 2540	is vacation a go	pto_request_status
@@ -2606,11 +2606,11 @@ id	text	intent
 2605	will you reserve a table at olive garden for 3 people at 7	restaurant_reservation
 2606	assure my bank i really am going to california	travel_notification
 2607	how to you spend your free time	what_are_your_hobbies
-2608	did i add "cleaning the foyer" to my todo list yet	todo_list
+2608	did i add 'cleaning the foyer' to my todo list yet	todo_list
 2609	both could be	maybe
 2610	are you real or a computer	are_you_a_bot
 2611	would you let me know who your boss is	who_do_you_work_for
-2612	"when the credit score improve	improve_credit_score
+2612	'when the credit score improve	improve_credit_score
 2613	what's the phone number for my credit card company	replacement_card_duration
 2614	send me more checkbooks please	order_checks
 2615	give me the routing number of my checking account at my main bank, first commerce	routing
@@ -2735,7 +2735,7 @@ id	text	intent
 2734	what is the reason humans even exist	meaning_of_life
 2735	what is the timezone for san francisco	timezone
 2736	how can i prevent my credit score from dropping	improve_credit_score
-2737	how do you spell "exactly	spelling
+2737	how do you spell 'exactly	spelling
 2738	the car you are driving uses what kind of gas	gas_type
 2739	what can i call you	what_is_your_name
 2740	what's a good, popular american meal	meal_suggestion
@@ -2829,7 +2829,7 @@ id	text	intent
 2828	can you roll a ten sided die and tell me the number	roll_dice
 2829	will this recipe still be good if i use milk instead of eggs	ingredient_substitution
 2830	what do they call you, ai	what_is_your_name
-2831	can you spell out "wonderful	spelling
+2831	can you spell out 'wonderful	spelling
 2832	set the ceiling fan to low	smart_home
 2833	how would they say butter in zambia	translate
 2834	what does ferrari mean	definition
@@ -2837,7 +2837,7 @@ id	text	intent
 2836	i need to know how busy denny's is at 6 am	how_busy
 2837	how long are my tires expected to last before needing to be replaced	tire_change
 2838	what ingredients are in beef jerkey	ingredients_list
-2839	"i"m headed out to lax and going to phl for a low price of $120 this weekend on the 12th	book_flight
+2839	'i'm headed out to lax and going to phl for a low price of $120 this weekend on the 12th	book_flight
 2840	give me a joke about the subject of bugs	tell_joke
 2841	why can't i access my chase account	account_blocked
 2842	can you tell me what the date of expiry for my visa card is	expiration_date
@@ -2953,7 +2953,7 @@ id	text	intent
 2952	i need to add something to my calendar for next tuesday	calendar_update
 2953	that isn't correct	no
 2954	where am i currently	current_location
-2955	"i'll be travelling from lax and headed to phl for 120 on the 10th of may	book_flight
+2955	'i'll be travelling from lax and headed to phl for 120 on the 10th of may	book_flight
 2956	i need to track my order	order_status
 2957	could you tell me how to direct deposit my check from work into nations bank	direct_deposit
 2958	do you know what is for dinner	meal_suggestion
@@ -3200,7 +3200,7 @@ id	text	intent
 3199	so how busy is the outback steakhouse at 5 pm	how_busy
 3200	definitely	yes
 3201	what does epicurean mean	definition
-3202	what's the right way to spell "emolument	spelling
+3202	what's the right way to spell 'emolument	spelling
 3203	what pets do you own	do_you_have_pets
 3204	can you check the amount of calories in a chicken sandwich	calories
 3205	what is today's fun fact	fun_fact
@@ -3605,7 +3605,7 @@ id	text	intent
 3604	friday needs to be clear on my calendar	calendar_update
 3605	i have to cancel my reservation	cancel_reservation
 3606	don't forget to tell me to call my mother	reminder_update
-3607	please play that song that goes, "starships were meant to fly	play_music
+3607	please play that song that goes, 'starships were meant to fly	play_music
 3608	tell me the weather	weather
 3609	how many calories does an orange have	calories
 3610	do you know when i'll receive my next paycheck	payday
@@ -3677,7 +3677,7 @@ id	text	intent
 3676	how many inches are in 36 feet	measurement_conversion
 3677	yup	yes
 3678	do you know how i order more checks for my well's fargo account	order_checks
-3679	"i'm fly out from lax to phl this weekend for around $120	book_flight
+3679	'i'm fly out from lax to phl this weekend for around $120	book_flight
 3680	can you make the default language swedish	change_language
 3681	i want to freeze my bank account	freeze_account
 3682	did i set a day on my calendar for voting in the next election	calendar
@@ -3953,7 +3953,7 @@ id	text	intent
 3952	are socket converters needed if i'm going to cape town	plug_type
 3953	can i transfer my 401k somewhere	rollover_401k
 3954	how's my credit score	credit_score
-3955	address me as "bailey	change_user_name
+3955	address me as 'bailey	change_user_name
 3956	change settings to sound like a female	change_accent
 3957	do people say per se is any good or not	restaurant_reviews
 3958	purchase grass seed from the store	order
@@ -3977,7 +3977,7 @@ id	text	intent
 3976	can you cancel that	cancel
 3977	i will be traveling to lima alert my bank	travel_notification
 3978	are there travel alerts in mexico	travel_alert
-3979	"which things are wanted to remember	reminder
+3979	'which things are wanted to remember	reminder
 3980	do i get charged extra for using my card in portland	international_fees
 3981	please call an uber for 6 people to go to amazon's southside warehouse	uber
 3982	either one might be	maybe
@@ -3989,7 +3989,7 @@ id	text	intent
 3988	i want to convert kilos to pounds	measurement_conversion
 3989	i'd like to add pancake mix to my shopping list if it's not already there	shopping_list_update
 3990	what do you enjoy doing in your off time	what_are_your_hobbies
-3991	"what's the method to improve credit score	improve_credit_score
+3991	'what's the method to improve credit score	improve_credit_score
 3992	check what is on my to-do list	todo_list
 3993	make saound function operate in whisper mode	whisper_mode
 3994	who can i talk to above you	who_do_you_work_for
@@ -4157,7 +4157,7 @@ id	text	intent
 4156	please read my shopping list	shopping_list
 4157	what's the latest i can pay my cellular bill	bill_due
 4158	how long does it take for a credit card to be reissued and mailed to me	replacement_card_duration
-4159	"which could be improve the credit score	improve_credit_score
+4159	'which could be improve the credit score	improve_credit_score
 4160	i want to hear my name	user_name
 4161	please verify my reservation for john at bardenay	confirm_reservation
 4162	tell me the status of my american airlines flight	flight_status
@@ -4448,7 +4448,7 @@ id	text	intent
 4447	what'd you say	repeat
 4448	how do i set up direct deposit	direct_deposit
 4449	tell me the full name of my health plan	insurance
-4450	"i'll leave to lax and go to phl for $120 on nov 5th	book_flight
+4450	'i'll leave to lax and go to phl for $120 on nov 5th	book_flight
 4451	what day of the month do i have to pay my mortgage	bill_due
 4452	i have to cancel my reservation after all, please	cancel_reservation
 4453	i'd like to buy a lamp online	order
