@@ -1,5 +1,5 @@
-benchmark,id,intent
-A,1,activate_my_card
-A,2,age_limit
-B,1,accept_reservations
-B,2,account_blocked
+name,benchmark,average_time_per_example,id,intent
+Jane Doe,A,7.02,1,activate_my_card
+Jane Doe,A,7.02,2,age_limit
+Jane Doe,B,7.51,1,accept_reservations
+Jane Doe,B,7.51,2,account_blocked

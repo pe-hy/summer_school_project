@@ -58,22 +58,27 @@ your own that stands on its own.
 
 ## The leaderboard
 
-Upload one file, CSV or JSON, with three columns: `benchmark`, `id`, `intent`.
-One row for every message in `test.tsv`, for each benchmark you enter. Both
-benchmarks can go in the same file.
+Upload one file, CSV or JSON, carrying your name, your measured speed, and a
+category for every message in `test.tsv`. Both benchmarks can go in one file.
 
 ```csv
-benchmark,id,intent
-A,1,card_arrival
-A,2,lost_card
-B,1,translate
+name,benchmark,average_time_per_example,id,intent
+Jane Doe,A,7.02,1,card_arrival
+Jane Doe,A,7.02,2,lost_card
+Jane Doe,B,7.51,1,translate
 ```
 
-You type your name and your milliseconds per message when you upload. Re-upload
-as often as you like.
+In JSON, the predictions nest under each benchmark:
 
-Ladders rank by accuracy. The overall standing is the average of your two
-accuracies. A skipped benchmark counts as 0.
+```json
+[
+  { "name": "Jane Doe", "benchmark": "A", "average_time_per_example": 7.02,
+    "predictions": [{ "id": 1, "intent": "card_arrival" }] }
+]
+```
+
+Re-upload as often as you like. Ladders rank by accuracy, and the overall
+standing is the average of your two accuracies. A skipped benchmark counts as 0.
 
 The board scores you on part of the test set. The final ranking uses the part it
 does not show you, so tuning against the leaderboard buys you nothing.

@@ -2,7 +2,7 @@
  *
  * Two benchmark ladders (A, B) + an overall standing, per the Efficient Intent
  * Classification Challenge. Rows come from /api/submissions; a row's ladder
- * score S = 100*accuracy - log2(latency_ms) is computed by the server.
+ * score S = 100*accuracy - log2(average_time_per_example) is computed by the server.
  * Identity = random owner token in localStorage; the server marks rows owned by
  * this browser with `mine: true` (one row per benchmark).
  */
@@ -26,10 +26,10 @@
   ];
   const BENCH_KEYS = BENCHMARKS.map((b) => b.key);
 
-  const PRED_FIELDS = ["benchmark", "id", "intent"];
+  const PRED_FIELDS = ["name", "benchmark", "average_time_per_example", "id", "intent"];
+  const TIME_FIELD = "average_time_per_example";
 
   const TOKEN_KEY = "ostrai_owner_token";
-  const NAME_KEY = "ostrai_name";
 
   // ---------------------------------------------------------------------------
   // DOM
@@ -56,8 +56,7 @@
     dropzoneFile: $("#dropzone-file"),
     validationBox: $("#validation-box"),
     warnBox: $("#warn-box"),
-    nameInput: $("#name-input"),
-    latencyInputs: {},
+
     previewBox: $("#preview-box"),
     previewEntries: $("#preview-entries"),
     dialogNote: $("#dialog-note"),
@@ -158,13 +157,15 @@
   const stripBOM = (s) => s.replace(/^\uFEFF/, "");
   const normalizeHeader = (h) => stripBOM(String(h)).toLowerCase().replace(/[^a-z0-9]/g, "");
   const CANONICAL_BY_NORMALIZED = {
+    name: "name", yourname: "name", student: "name", team: "name",
     benchmark: "benchmark", bench: "benchmark", project: "benchmark", task: "benchmark",
+    averagetimeperexample: TIME_FIELD, avgtimeperexample: TIME_FIELD, averagetime: TIME_FIELD,
+    latencyms: TIME_FIELD, latency: TIME_FIELD, msperexample: TIME_FIELD, timeperexample: TIME_FIELD,
     id: "id", messageid: "id", exampleid: "id", testid: "id",
     intent: "intent", label: "intent", category: "intent", prediction: "intent", predictedintent: "intent",
   };
-  // Headers from the OLD schema get a pointed error instead of silent misreads.
-  const OLD_SCHEMA = new Set(["metric", "accuracy", "acc", "latencyms", "latency", "avgtimes", "name"]);
-  const OLD_SCHEMA_MSG = "This looks like the old results format. Upload your predictions now: one row per test message with the columns benchmark, id, intent. Your name and speed are asked for below.";
+  const OLD_SCHEMA = new Set(["metric", "accuracy", "acc", "avgtimes"]);
+  const OLD_SCHEMA_MSG = "This looks like the old results format. Upload predictions now: one row per test message, with the columns name, benchmark, average_time_per_example, id and intent.";
 
   function normalizeBenchmark(v) {   // mirrors app.py normalize_benchmark
     if (typeof v !== "string") return null;
@@ -228,7 +229,7 @@
     if (keys.includes("__old__")) return { errors: [OLD_SCHEMA_MSG] };
     const missing = PRED_FIELDS.filter((f) => !keys.includes(f));
     if (missing.length) {
-      return { errors: [`Missing column(s): ${missing.join(", ")}. The file needs benchmark, id and intent.`] };
+      return { errors: [`Missing column(s): ${missing.join(", ")}. The file needs ${PRED_FIELDS.join(", ")}.`] };
     }
     const out = [];
     for (let r = 1; r < rows.length; r++) {
@@ -247,30 +248,49 @@
     let data;
     try { data = JSON.parse(stripBOM(text)); }
     catch (e) { return { errors: [`Invalid JSON: ${e.message}`] }; }
-    if (!Array.isArray(data)) return { errors: ["The JSON must be an array of {benchmark, id, intent} objects."] };
+    if (!Array.isArray(data)) data = [data];
     if (!data.length) return { errors: ["The file is empty."] };
-    const out = [];
-    for (const item of data) {
-      if (item === null || typeof item !== "object" || Array.isArray(item)) {
-        return { errors: ["Every entry must be an object with benchmark, id and intent."] };
-      }
+
+    const canon = (item) => {
       const obj = {};
       let sawOld = false;
       for (const [k, v] of Object.entries(item)) {
         const norm = normalizeHeader(k);
+        if (norm === "predictions") { obj.predictions = v; continue; }
         const key = CANONICAL_BY_NORMALIZED[norm];
         if (!key) { if (OLD_SCHEMA.has(norm)) sawOld = true; continue; }
         obj[key] = typeof v === "string" ? v.trim() : v;
       }
-      if (sawOld && obj.id === undefined) return { errors: [OLD_SCHEMA_MSG] };
-      out.push(obj);
+      return { obj, sawOld };
+    };
+
+    const out = [];
+    for (const item of data) {
+      if (item === null || typeof item !== "object" || Array.isArray(item)) {
+        return { errors: ["Every entry must be an object."] };
+      }
+      const { obj, sawOld } = canon(item);
+      if (Array.isArray(obj.predictions)) {
+        // nested shape: one object per benchmark, carrying its own prediction list
+        for (const p of obj.predictions) {
+          if (p === null || typeof p !== "object" || Array.isArray(p)) {
+            return { errors: ["Every prediction must be an object with id and intent."] };
+          }
+          const { obj: inner } = canon(p);
+          out.push({ ...obj, ...inner, predictions: undefined });
+        }
+      } else {
+        if (sawOld && obj.id === undefined) return { errors: [OLD_SCHEMA_MSG] };
+        out.push(obj);
+      }
     }
     return { rows: out, errors: [] };
   }
 
-  // Group prediction rows per benchmark and check them before anything is sent.
-  function parseSubmissionFile(name, text) {
-    const lower = name.toLowerCase();
+  // Group prediction rows per benchmark. The file carries everything the server
+  // needs: who submitted, how fast their system was, and one row per test message.
+  function parseSubmissionFile(fileName, text) {
+    const lower = fileName.toLowerCase();
     let parsed;
     if (lower.endsWith(".json")) parsed = rowsFromJSON(text);
     else if (lower.endsWith(".csv") || lower.endsWith(".tsv")) parsed = rowsFromCSV(text);
@@ -280,6 +300,7 @@
     const byBench = {};
     const errors = [];
     const badBench = new Set();
+    const names = new Set();
     for (const row of parsed.rows) {
       const bench = normalizeBenchmark(String(row.benchmark ?? ""));
       if (!bench) { badBench.add(String(row.benchmark ?? "(empty)").slice(0, 20)); continue; }
@@ -287,31 +308,54 @@
       if (!Number.isInteger(id)) { errors.push(`Benchmark ${bench}: '${row.id}' is not a whole-number id.`); break; }
       const intent = String(row.intent ?? "").trim();
       if (!intent) { errors.push(`Benchmark ${bench}: id ${id} has no intent.`); break; }
-      (byBench[bench] = byBench[bench] || []).push({ id, intent });
+      const group = byBench[bench] || (byBench[bench] = { predictions: [], times: new Set() });
+      group.predictions.push({ id, intent });
+      if (row.name !== undefined && String(row.name).trim()) names.add(String(row.name).trim().replace(/\s+/g, " "));
+      if (row[TIME_FIELD] !== undefined && String(row[TIME_FIELD]).trim() !== "") {
+        group.times.add(String(row[TIME_FIELD]).trim().replace(",", "."));
+      }
     }
     if (badBench.size) {
       errors.push(`The benchmark column must say A or B, found ${[...badBench].slice(0, 3).map((b) => `'${b}'`).join(", ")}.`);
     }
     const benches = Object.keys(byBench).sort();
     if (!errors.length && !benches.length) errors.push("No predictions found in the file.");
+
+    if (!names.size) errors.push("The file does not say who this is. Add a name column or field.");
+    else if (names.size > 1) errors.push(`The file carries more than one name: ${[...names].slice(0, 3).join(", ")}.`);
+
     for (const bench of benches) {
-      const rows = byBench[bench];
-      const ids = new Set(rows.map((r) => r.id));
-      if (ids.size !== rows.length) {
-        errors.push(`Benchmark ${bench}: ${rows.length - ids.size} duplicate id(s). Predict each test message once.`);
+      const group = byBench[bench];
+      const ids = new Set(group.predictions.map((r) => r.id));
+      if (ids.size !== group.predictions.length) {
+        errors.push(`Benchmark ${bench}: ${group.predictions.length - ids.size} duplicate id(s). Predict each test message once.`);
       }
       const expected = CONFIG.TEST_ROWS[bench];
-      if (expected && rows.length !== expected) {
-        errors.push(`Benchmark ${bench}: ${rows.length.toLocaleString()} predictions, but test.tsv has ${expected.toLocaleString()} messages. Predict every row.`);
+      if (expected && group.predictions.length !== expected) {
+        errors.push(`Benchmark ${bench}: ${group.predictions.length.toLocaleString()} predictions, but test.tsv has ${expected.toLocaleString()} messages. Predict every row.`);
+      }
+      if (group.times.size === 0) {
+        errors.push(`Benchmark ${bench}: no ${TIME_FIELD}. Add your measured milliseconds per message.`);
+      } else if (group.times.size > 1) {
+        errors.push(`Benchmark ${bench}: ${TIME_FIELD} differs between rows (${[...group.times].slice(0, 3).join(", ")}). It is one number per benchmark.`);
+      } else if (!Number.isFinite(Number([...group.times][0])) || Number([...group.times][0]) < 0) {
+        errors.push(`Benchmark ${bench}: ${TIME_FIELD} must be a number of milliseconds, 0 or more.`);
       }
     }
     if (errors.length) return { clean: null, errors };
-    return { clean: benches.map((bench) => ({ benchmark: bench, predictions: byBench[bench] })), errors: [] };
+
+    const name = [...names][0].slice(0, CONFIG.MAX_NAME_LEN);
+    return {
+      clean: benches.map((bench) => ({
+        name,
+        benchmark: bench,
+        [TIME_FIELD]: Number([...byBench[bench].times][0]),
+        predictions: byBench[bench].predictions,
+      })),
+      errors: [],
+    };
   }
 
-  // ---------------------------------------------------------------------------
-  // Validation (keep in sync with app.py validate_entry / validate_submission)
-  // ---------------------------------------------------------------------------
   // ---------------------------------------------------------------------------
   // Scoring & standings
   // ---------------------------------------------------------------------------
@@ -333,7 +377,7 @@
   // Competition ranking: ties on accuracy at the displayed 2 dp (%) share a rank.
   function computeRanks(rows) {
     const sorted = [...rows].sort((a, b) =>
-      (b.metric - a.metric) || (a.latency_ms - b.latency_ms) ||
+      (b.metric - a.metric) || (a.average_time_per_example - b.average_time_per_example) ||
       String(a.submitted_at).localeCompare(String(b.submitted_at)));
     let lastRank = 0, lastKey = null;
     return sorted.map((r, i) => {
@@ -390,7 +434,7 @@
     const iw = Math.max(60, width - M.l - M.r);
     const ih = Math.max(60, height - M.t - M.b);
     const clampL = (v) => Math.max(v, CONFIG.LATENCY_FLOOR_MS);
-    const us = rows.map((r) => Math.log10(clampL(r.latency_ms)));
+    const us = rows.map((r) => Math.log10(clampL(r.average_time_per_example)));
     let u0 = Math.floor(Math.min(...us));
     let u1 = Math.ceil(Math.max(...us));
     if (u1 === u0) u1 += 1;
@@ -414,7 +458,7 @@
 
     const points = rows.map((r) => ({
       row: r,
-      x: xPos(r.latency_ms),
+      x: xPos(r.average_time_per_example),
       y: yPos(r.metric * 100),
     }));
     return { M, iw, ih, width, height, u0, u1, xTicks, yTicks, xPos, yPos, points };
@@ -478,7 +522,7 @@
     const r = target.getBoundingClientRect();
     const cx = r.left + r.width / 2 - boxRect.left;
     const cy = r.top + r.height / 2 - boxRect.top;
-    P.tip.textContent = `${p.row.name}: ${fmtPct(p.row.metric)}, ${fmtLatency(p.row.latency_ms)} ms/ex`;
+    P.tip.textContent = `${p.row.name}: ${fmtPct(p.row.metric)}, ${fmtLatency(p.row.average_time_per_example)} ms/ex`;
     P.tip.hidden = false;
     const half = P.tip.offsetWidth / 2;
     P.tip.style.left = `${Math.min(Math.max(cx, half + 2), boxRect.width - half - 2)}px`;
@@ -502,7 +546,7 @@
     P.empty.hidden = true;
     if (!P.host.offsetParent) { P.lastKey = null; return; }   // panel hidden: render on tab switch
     const width = Math.max(320, P.host.clientWidth || 640);
-    const key = width + "|" + rows.map((r) => `${r.id},${r.name},${r.metric},${r.latency_ms},${r.mine ? 1 : 0}`).join(";");
+    const key = width + "|" + rows.map((r) => `${r.id},${r.name},${r.metric},${r.average_time_per_example},${r.mine ? 1 : 0}`).join(";");
     if (key === P.lastKey) { relayoutNames(bench); return; }
     P.lastKey = key;
     hidePlotTip(bench);
@@ -629,7 +673,7 @@
   }
 
   const collator = new Intl.Collator(undefined, { sensitivity: "base", numeric: true });
-  const DEFAULT_DIR = { metric: "desc", latency_ms: "asc", name: "asc", submitted_at: "desc", rank: "asc", accA: "desc", accB: "desc", accFinal: "desc" };
+  const DEFAULT_DIR = { metric: "desc", average_time_per_example: "asc", name: "asc", submitted_at: "desc", rank: "asc", accA: "desc", accB: "desc", accFinal: "desc" };
 
   function sortView(rows, view) {
     const { sortKey, sortDir } = view;
@@ -672,7 +716,7 @@
     if (dom.tbody.contains(document.activeElement)) return;   // keyboard user inside: retry next poll
     const rows = sortView(state.ladders[bench], view);
     const key = `${view.sortKey}|${view.sortDir}|` +
-      rows.map((r) => `${r.id},${r.name},${r.metric},${r.latency_ms},${r.rank},${r.mine ? 1 : 0},${r.submitted_at}`).join(";");
+      rows.map((r) => `${r.id},${r.name},${r.metric},${r.average_time_per_example},${r.rank},${r.mine ? 1 : 0},${r.submitted_at}`).join(";");
     if (key === view.lastTableKey) return;
     view.lastTableKey = key;
 
@@ -710,7 +754,7 @@
       }
       tr.appendChild(nameCell);
       tr.appendChild(td("num score-cell", fmtPct(r.metric)));
-      tr.appendChild(td("num", fmtLatency(r.latency_ms)));
+      tr.appendChild(td("num", fmtLatency(r.average_time_per_example)));
       const dateCell = td("date", fmtDate(r.submitted_at));
       dateCell.title = r.submitted_at;
       tr.appendChild(dateCell);
@@ -948,7 +992,6 @@
     state.pending = null;
     state.pendingFile = null;
     state.fileSeq++;
-    el.latencyInputs = {};
     el.fileInput.value = "";
     el.dropzoneFile.textContent = "";
     el.validationBox.hidden = true;
@@ -961,9 +1004,6 @@
     el.btnSubmitUpload.disabled = true;
     el.btnSubmitUpload.textContent = "Submit";
     el.uploadTitle.textContent = "Upload predictions";
-    let remembered = "";
-    try { remembered = localStorage.getItem(NAME_KEY) || ""; } catch (_) { /* ignore */ }
-    el.nameInput.value = remembered || (state.mine.A || state.mine.B || {}).name || "";
     el.dialogNote.textContent = storageOk
       ? "Your browser remembers this upload so you can replace or delete it later."
       : "Storage is blocked in this browser, so you will not be able to edit these results after a reload.";
@@ -1013,69 +1053,26 @@
     return warnings;
   }
 
-  function readName() {
-    return (el.nameInput.value || "").trim().replace(/\s+/g, " ").slice(0, CONFIG.MAX_NAME_LEN);
-  }
-
-  function readLatency(bench) {
-    const input = el.latencyInputs[bench];
-    if (!input) return NaN;
-    const raw = (input.value || "").trim().replace(",", ".");
-    return raw === "" ? NaN : Number(raw);
-  }
-
-  // Submit is enabled only once the file, the name and every speed are in place.
-  function refreshSubmitState() {
-    if (!state.pending) { el.btnSubmitUpload.disabled = true; return; }
-    let problem = "";
-    if (!readName()) problem = "Type the name that should appear on the board.";
-    if (!problem) {
-      for (const e of state.pending) {
-        const ms = readLatency(e.benchmark);
-        if (!Number.isFinite(ms) || ms < 0) { problem = `Type your milliseconds per message for Benchmark ${e.benchmark}.`; break; }
-      }
-    }
-    el.dialogNote.textContent = problem || (storageOk
-      ? "Your browser remembers this upload so you can replace or delete it later."
-      : "Storage is blocked in this browser, so you will not be able to edit these results after a reload.");
-    el.btnSubmitUpload.disabled = Boolean(problem) || state.submitting;
-    if (!state.submitting) el.btnSubmitUpload.textContent = submitLabel(state.pending);
-  }
-
   function showPreview(entries) {
     el.previewEntries.replaceChildren();
-    el.latencyInputs = {};
     for (const e of entries) {
       const wrap = document.createElement("div");
       wrap.className = "preview-row";
       const h = document.createElement("h4");
       h.textContent = `Benchmark ${e.benchmark}`;
       wrap.appendChild(h);
-
       const dl = document.createElement("dl");
       dl.className = "preview-grid";
-      const dt = document.createElement("dt"); dt.textContent = "Predictions";
-      const dd = document.createElement("dd");
-      dd.textContent = `${e.predictions.length.toLocaleString()} rows, ` +
-        `${new Set(e.predictions.map((p) => p.intent)).size} distinct categories`;
-      const dt2 = document.createElement("dt"); dt2.textContent = "Speed";
-      const dd2 = document.createElement("dd");
-      const input = document.createElement("input");
-      input.type = "number";
-      input.step = "0.01";
-      input.min = "0";
-      input.className = "latency-input";
-      input.placeholder = "7.02";
-      input.setAttribute("aria-label", `Milliseconds per message for Benchmark ${e.benchmark}`);
-      input.addEventListener("input", refreshSubmitState);
-      el.latencyInputs[e.benchmark] = input;
-      const unit = document.createElement("span");
-      unit.className = "latency-unit";
-      unit.textContent = "ms per message";
-      dd2.append(input, unit);
-      dl.append(dt, dd, dt2, dd2);
+      const add = (k, v) => {
+        const dt = document.createElement("dt"); dt.textContent = k;
+        const dd = document.createElement("dd"); dd.textContent = v;
+        dl.append(dt, dd);
+      };
+      add("Name", e.name);
+      add("Predictions", `${e.predictions.length.toLocaleString()} rows, ` +
+        `${new Set(e.predictions.map((p) => p.intent)).size} distinct categories`);
+      add("Speed", `${fmtLatency(e[TIME_FIELD])} ms per message`);
       wrap.appendChild(dl);
-
       const current = state.mine[e.benchmark];
       if (current) {
         const delta = document.createElement("p");
@@ -1093,10 +1090,11 @@
     if (errors.length) { showValidation(errors); showWarnings([]); return; }
     state.pending = clean;
     const rows = clean.reduce((n, e) => n + e.predictions.length, 0);
-    showValidation([], { okMessage: `Read ${rows.toLocaleString()} predictions. Add your name and speed below, then press Submit.` });
+    showValidation([], { okMessage: `Read ${rows.toLocaleString()} predictions. Press Submit and the site will score them.` });
     showWarnings(collectWarnings(clean));
     showPreview(clean);
-    refreshSubmitState();
+    el.btnSubmitUpload.disabled = false;
+    el.btnSubmitUpload.textContent = submitLabel(clean);
   }
 
   async function handleFile(file) {
@@ -1136,17 +1134,9 @@
 
   async function submitPending() {
     if (!state.pending || state.submitting) return;
-    const name = readName();
-    try { localStorage.setItem(NAME_KEY, name); } catch (_) { /* ignore */ }
-    const body = state.pending.map((e) => ({
-      name,
-      benchmark: e.benchmark,
-      latency_ms: readLatency(e.benchmark),
-      predictions: e.predictions,
-    }));
     setSubmitting(true);
     try {
-      const res = await api("PUT", "/api/submissions/mine", body);
+      const res = await api("PUT", "/api/submissions/mine", state.pending);
       setSubmitting(false);
       el.uploadDialog.close();
       await refresh({ silent: false });
@@ -1159,7 +1149,7 @@
         : err.status === 409 || err.status === 507 ? "Submission refused:" : "Could not submit:";
       if (el.uploadDialog.open) showValidation(details, { title });
       else showToast(`Submission failed: ${details[0]}`, "error");
-      refreshSubmitState();
+      el.btnSubmitUpload.disabled = false;
     }
   }
 
@@ -1290,7 +1280,6 @@
     wireSort(el.overallTable.querySelectorAll("th[data-key]"), "overall", renderOverallTable);
 
     el.btnOpenUpload.addEventListener("click", () => openUploadDialog());
-    el.nameInput.addEventListener("input", refreshSubmitState);
     el.btnCloseUpload.addEventListener("click", () => el.uploadDialog.close());
     el.btnCancelUpload.addEventListener("click", () => el.uploadDialog.close());
     el.btnSubmitUpload.addEventListener("click", submitPending);

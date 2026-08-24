@@ -1,22 +1,32 @@
 [
   {
+    "name": "Jane Doe",
     "benchmark": "A",
-    "id": 1,
-    "intent": "activate_my_card"
+    "average_time_per_example": 7.02,
+    "predictions": [
+      {
+        "id": 1,
+        "intent": "activate_my_card"
+      },
+      {
+        "id": 2,
+        "intent": "age_limit"
+      }
+    ]
   },
   {
-    "benchmark": "A",
-    "id": 2,
-    "intent": "age_limit"
-  },
-  {
+    "name": "Jane Doe",
     "benchmark": "B",
-    "id": 1,
-    "intent": "accept_reservations"
-  },
-  {
-    "benchmark": "B",
-    "id": 2,
-    "intent": "account_blocked"
+    "average_time_per_example": 7.51,
+    "predictions": [
+      {
+        "id": 1,
+        "intent": "accept_reservations"
+      },
+      {
+        "id": 2,
+        "intent": "account_blocked"
+      }
+    ]
   }
 ]

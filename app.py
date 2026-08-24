@@ -54,11 +54,11 @@ ADMIN_KEY = os.environ.get("LEADERBOARD_ADMIN_KEY") or None
 # Submission schema (keep in sync with static/app.js and submit_readme.md)
 # ----------------------------------------------------------------------------
 STRING_FIELDS = ("name",)
-NUMBER_FIELDS = ("latency_ms",)
-NON_NEGATIVE_FIELDS = ("latency_ms",)
 BENCHMARKS = ("A", "B")
-FIELDS = STRING_FIELDS + ("benchmark", "latency_ms", "predictions")
-MAX_ABS_LATENCY = 1e7          # 10,000 s per message is beyond any real run
+TIME_FIELD = "average_time_per_example"
+TIME_ALIASES = (TIME_FIELD, "latency_ms")     # the old name still parses
+FIELDS = STRING_FIELDS + ("benchmark", "predictions") + TIME_ALIASES
+MAX_TIME_MS = 1e7              # 10,000 s per message is beyond any real run
 MAX_NAME_LEN = 80
 MAX_ABS_NUMBER = 1e15          # anything bigger is certainly a mistake
 MAX_SUBMISSIONS = 500          # hard cap on rows (the API is unauthenticated)
@@ -144,13 +144,13 @@ def _migrate_legacy_rows() -> None:
     file has been copied to a .bak next to it, so nothing is lost irreversibly."""
     legacy = [doc for doc in submissions.all()
               if any(k in doc for k in ("surname", "train_time_s", "test_time_s", "avg_time_s"))
-              or "latency_ms" not in doc or doc.get("benchmark") not in BENCHMARKS]
+              or TIME_FIELD not in doc or doc.get("benchmark") not in BENCHMARKS]
     if legacy and DB_PATH.exists():
         with contextlib.suppress(OSError):
             shutil.copy2(DB_PATH, DB_PATH.with_name(DB_PATH.name + ".pre-migration.bak"))
     for doc in submissions.all():
         if (any(k in doc for k in ("surname", "train_time_s", "test_time_s", "avg_time_s"))
-                or "latency_ms" not in doc or doc.get("benchmark") not in BENCHMARKS):
+                or TIME_FIELD not in doc or doc.get("benchmark") not in BENCHMARKS):
             print(f"NOTE: removing legacy submission {doc.get('name', '?')!r}: the schema changed "
                   "(two benchmarks, latency in ms); ask the owner to re-upload.", file=sys.stderr)
             submissions.remove(doc_ids=[doc.doc_id])
@@ -301,11 +301,12 @@ def score_predictions(bench: str, predictions: object) -> tuple[dict | None, lis
 # Validation
 # ----------------------------------------------------------------------------
 def validate_entry(data: object) -> tuple[dict | None, list[str]]:
-    """One benchmark's submission: name, benchmark, latency_ms and predictions.
+    """One benchmark's submission: name, benchmark, average_time_per_example and predictions.
     The accuracy is computed here from the answer key, never taken from the client."""
     errors: list[str] = []
     if not isinstance(data, dict):
-        return None, ["Each result must be an object with name, benchmark, latency_ms and predictions."]
+        return None, ["Each result must be an object with name, benchmark, "
+                      "average_time_per_example and predictions."]
 
     unknown = sorted(str(k).encode("utf-8", "replace").decode("utf-8")[:40] for k in set(data) - set(FIELDS))
     if unknown:
@@ -337,18 +338,24 @@ def validate_entry(data: object) -> tuple[dict | None, list[str]]:
         else:
             clean["benchmark"] = bench
 
-    if "latency_ms" not in data:
-        errors.append("Missing field 'latency_ms'.")
+    given = next((k for k in TIME_ALIASES if k in data), None)
+    if given is None:
+        errors.append(f"Missing field '{TIME_FIELD}'.")
     else:
-        value = data["latency_ms"]
+        value = data[given]
+        if isinstance(value, str):
+            try:
+                value = float(value.strip().replace(",", "."))
+            except ValueError:
+                value = None
         try:
             number = float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
         except OverflowError:
             number = None
-        if number is None or number != number or not 0 <= number <= MAX_ABS_LATENCY:
-            errors.append("'latency_ms' must be a number of milliseconds per message, 0 or more.")
+        if number is None or number != number or not 0 <= number <= MAX_TIME_MS:
+            errors.append(f"'{TIME_FIELD}' must be a number of milliseconds per message, 0 or more.")
         else:
-            clean["latency_ms"] = number
+            clean[TIME_FIELD] = number
 
     if "predictions" not in data:
         errors.append("Missing field 'predictions'.")
@@ -411,7 +418,7 @@ def public_row(doc: dict, owner_hash: str | None) -> dict:
         "name": doc.get("name", ""),
         "benchmark": doc.get("benchmark"),
         "metric": doc.get("metric"),   # public slice only; metric_hidden is never served
-        "latency_ms": doc.get("latency_ms"),
+        TIME_FIELD: doc.get(TIME_FIELD),
         "person_key": doc.get("person_key"),
         "submitted_at": doc.get("submitted_at", ""),
         "mine": bool(owner_hash) and doc.get("owner_hash") == owner_hash,
