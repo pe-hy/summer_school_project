@@ -25,6 +25,8 @@ Per benchmark, in `benchmark_a/` and `benchmark_b/`:
 | `intents.txt` | the category names, one per line |
 | `test.tsv` | the evaluation messages with their correct categories |
 
+[Download the data](/data/benchmarks.zip)
+
 ## Labels
 
 The training pool is unlabeled on purpose. Producing labels is part of the

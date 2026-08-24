@@ -39,9 +39,10 @@ PYTHON_VERSIONS = ("python313", "python312", "python311", "python310")
 UPLOAD = [  # (directory or file relative to ROOT, recursive)
     "app.py", "submit_readme.md", "README.md", "requirements.txt", "seed_demo.py",
     "static", "examples", "vendor",
-    "workshop/ASSIGNMENT.md",   # ONLY this file from workshop/ — instructor notes must never ship
+    "workshop/ASSIGNMENT.md",        # ONLY this file from workshop/, instructor notes must never ship
+    "workshop/data/benchmark_a", "workshop/data/benchmark_b",   # never workshop/data/_instructor
 ]
-SKIP_DIRS = {"__pycache__", ".git", "data", "node_modules"}
+SKIP_DIRS = {"__pycache__", ".git", "node_modules", "_instructor"}
 
 
 # ----------------------------------------------------------------------------

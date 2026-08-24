@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import io
 import hmac
 import json
 import os
@@ -27,11 +28,12 @@ import sys
 import tempfile
 import threading
 import unicodedata
+import zipfile
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from flask import Flask, abort, jsonify, request, send_from_directory
+from flask import Flask, abort, jsonify, request, send_file, send_from_directory
 from werkzeug.exceptions import BadRequest, HTTPException, InternalServerError
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -492,6 +494,31 @@ def assignment():
 def assignment_md():
     # Serve exactly this one file; nothing else in workshop/ is ever exposed.
     return send_from_directory(BASE_DIR / "workshop", "ASSIGNMENT.md", mimetype="text/markdown")
+
+
+_data_zip: bytes | None = None
+_data_zip_lock = threading.Lock()
+
+
+@app.get("/data/benchmarks.zip")
+def benchmarks_zip():
+    """The student data, zipped on first request and cached in memory.
+    Only benchmark_* directories are included, so the pool answer key in
+    workshop/data/_instructor/ can never be served."""
+    global _data_zip
+    with _data_zip_lock:
+        if _data_zip is None:
+            folders = sorted((BASE_DIR / "workshop" / "data").glob("benchmark_*"))
+            files = [(d.name, f) for d in folders if d.is_dir() for f in sorted(d.iterdir()) if f.is_file()]
+            if not files:
+                abort(404, description="The data files are not installed on this server.")
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+                for folder, f in files:
+                    zf.write(f, f"{folder}/{f.name}")
+            _data_zip = buf.getvalue()
+    return send_file(io.BytesIO(_data_zip), mimetype="application/zip",
+                     as_attachment=True, download_name="ostrai-2026-benchmarks.zip")
 
 
 @app.get("/static/<path:filename>")
