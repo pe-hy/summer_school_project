@@ -475,16 +475,6 @@ def upsert_my_submission():
                        "uploaded from a different browser. If it is yours, upload from that browser, or ask "
                        "an organiser to remove it.")
                 return jsonify({"error": "Duplicate person.", "details": [msg]}), 409
-            # one token, one name — but rows this request replaces don't pin the old name,
-            # so a student can fix a typo by re-uploading the affected benchmark(s)
-            mine_other = submissions.get(
-                (Submission.owner_hash == owner_hash) & (Submission.person_key != pk)
-                & (~Submission.benchmark.one_of(req_benches)))
-            if mine_other:
-                msg = (f"You already have a Benchmark {mine_other.get('benchmark', '?')} result under the name "
-                       f"\"{mine_other.get('name', '?')}\". Use the same name for both benchmarks, or re-upload "
-                       "both results in one file to rename.")
-                return jsonify({"error": "Name mismatch.", "details": [msg]}), 422
         # only genuinely new rows count against the cap — replacing is always allowed
         inserts = [e for e in entries if not submissions.get(
             (Submission.owner_hash == owner_hash) & (Submission.benchmark == e["benchmark"]))]
