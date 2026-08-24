@@ -19,10 +19,17 @@ Notes:
 
 - Ids are positions after shuffling with a fixed seed, so ordering carries no signal.
   Re-running the build script reproduces the files byte for byte.
-- BANKING77 ships one label with an odd capital (`refund_not_showing_up`); it is
-  lowercased here so the category names are consistent.
+- BANKING77 ships one category name with an inconsistent capital letter; it is
+  lowercased here so all category names look the same.
+- Double quotes in messages are replaced by apostrophes (93 messages of ~35,500).
+  A field that starts with a quote makes `pandas.read_csv` and `csv.reader` treat
+  it as an opening quote and swallow the following rows, which silently loses
+  thousands of examples. With the replacement the files parse identically under
+  `line.split("\t")`, `csv.DictReader` and `pandas.read_csv(sep="\t")`, all with
+  default settings.
 - A handful of messages appear in both pool and test (7 in A, 1 in B). That is in
   the original corpora and is left as is.
 - Reference baseline (char TF-IDF + LinearSVC trained on the full pool labels):
-  90.7 % on A, 91.9 % on B, under 1 ms per message on CPU. Students working from
-  LLM labels should land below this.
+  90.65 % on A, 92.56 % on B, about 0.5 ms per message on CPU. The published
+  numbers for that model are 90.4 and 92.3, so the data lines up. Students
+  working from LLM labels should land below this.
