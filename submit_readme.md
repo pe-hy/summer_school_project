@@ -55,11 +55,19 @@ Press Submit and the site tells you your accuracy straight away.
 
 Your browser remembers your uploads, so you can re-upload as often as you like;
 a new file replaces the benchmarks it contains. You can also delete either
-benchmark. Switching browsers loses that link, so ask an organiser.
+benchmark.
 
-Each name appears once per benchmark. If your upload is refused with
-*"a submission under this name already exists"*, it was either you from another
-browser or a namesake. Either way, ask an organiser.
+That memory lives in the browser, not in an account, which has two consequences:
+
+- **On a shared or lab machine**, the browser may still be holding someone
+  else's upload. The site shows you whose result it has before you replace or
+  delete anything. If the name is not yours, work in a private window instead.
+- **Switching browsers or machines** starts a fresh identity, so the site will
+  not let you edit your earlier row. Stick to one browser, or ask an organiser.
+
+If the name you type is already on the board from another browser, the site says
+so. If that is genuinely you, upload from the browser you used before. If you
+just share a name with someone, add something that tells you apart.
 
 ## Common mistakes
 

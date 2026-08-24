@@ -471,9 +471,9 @@ def upsert_my_submission():
             other_owner = submissions.get(
                 (Submission.person_key == pk) & (Submission.owner_hash != owner_hash))
             if other_owner:
-                msg = (f"A submission under the name {other_owner.get('name', '?')} already exists and was "
-                       "uploaded from a different browser. If it is yours, upload from that browser, or ask "
-                       "an organiser to remove it.")
+                msg = (f"The name {other_owner.get('name', '?')} is already on the board from a different "
+                       "browser. If that is you, upload from that browser. If you are someone else with the "
+                       "same name, add something to tell you apart and upload again.")
                 return jsonify({"error": "Duplicate person.", "details": [msg]}), 409
             # one token, one name — but rows this request replaces don't pin the old name,
             # so a student can fix a typo by re-uploading the affected benchmark(s)

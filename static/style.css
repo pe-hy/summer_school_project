@@ -438,6 +438,14 @@ td.num.missing { color: var(--line-strong); }
 .preview-row:nth-child(2) h4 { color: var(--blue); }
 .preview-row .preview-grid { border: 0; padding: 0; }
 .preview-delta { margin: .4rem 0 0; font-size: .85rem; color: var(--amber-ink); }
+.preview-clobber {
+  background: var(--red-tint);
+  border: 1px solid #f2b8b8;
+  border-radius: 6px;
+  padding: .5rem .7rem;
+  color: #7a1f1f;
+  font-weight: 600;
+}
 
 /* ---------- footer ---------- */
 .site-footer {

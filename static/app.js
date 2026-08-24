@@ -879,7 +879,9 @@
         slot.appendChild(tag);
         if (m) {
           const txt = document.createElement("span");
-          txt.append(`${fmtPct(m.metric)} · #${m.rank} `);
+          const who = document.createElement("strong");
+          who.textContent = m.name;
+          txt.append(who, ` ${fmtPct(m.metric)} · #${m.rank} `);
           slot.appendChild(txt);
           const rep = document.createElement("button");
           rep.type = "button";
@@ -977,6 +979,14 @@
   // ---------------------------------------------------------------------------
   function submitLabel(entries) {
     if (!entries || !entries.length) return "Submit";
+    const clobbered = entries.filter((e) => {
+      const cur = state.mine[e.benchmark];
+      return cur && cur.name.trim().toLowerCase() !== String(e.name).trim().toLowerCase();
+    });
+    if (clobbered.length) {
+      const names = [...new Set(clobbered.map((e) => state.mine[e.benchmark].name))];
+      return `Replace ${names.join(" and ")}'s result${clobbered.length > 1 ? "s" : ""}`;
+    }
     if (entries.length === 2) {
       const rep = entries.map((e) => !!state.mine[e.benchmark]);
       if (rep[0] && rep[1]) return "Replace both results";
@@ -1053,6 +1063,8 @@
     return warnings;
   }
 
+  const sameperson_class = (same) => (same ? "preview-delta" : "preview-delta preview-clobber");
+
   function showPreview(entries) {
     el.previewEntries.replaceChildren();
     for (const e of entries) {
@@ -1076,8 +1088,11 @@
       const current = state.mine[e.benchmark];
       if (current) {
         const delta = document.createElement("p");
-        delta.className = "preview-delta";
-        delta.textContent = `replaces your current Benchmark ${e.benchmark} result (accuracy ${fmtPct(current.metric)})`;
+        const sameperson = current.name.trim().toLowerCase() === String(e.name).trim().toLowerCase();
+        delta.className = sameperson_class(sameperson);
+        delta.textContent = sameperson
+          ? `replaces your current Benchmark ${e.benchmark} result (accuracy ${fmtPct(current.metric)})`
+          : `This browser already holds the Benchmark ${e.benchmark} result of ${current.name} (accuracy ${fmtPct(current.metric)}). Submitting replaces it. If ${current.name} is not you, cancel and upload from a private window.`;
         wrap.appendChild(delta);
       }
       el.previewEntries.appendChild(wrap);
@@ -1158,8 +1173,14 @@
   // ---------------------------------------------------------------------------
   function openDeleteDialog(bench) {
     state.deleteBench = bench;
-    el.deleteTitle.textContent = `Delete your Benchmark ${bench} result?`;
-    el.deleteHint.textContent = `This removes your row from the Benchmark ${bench} ladder (the other benchmark is untouched). You can upload a new file at any time.`;
+    const row = state.mine[bench];
+    const who = row ? row.name : "";
+    el.deleteTitle.textContent = who
+      ? `Delete ${who}'s Benchmark ${bench} result?`
+      : `Delete your Benchmark ${bench} result?`;
+    el.deleteHint.textContent = who
+      ? `This removes the Benchmark ${bench} row submitted from this browser, currently on the board as ${who}. If that is not you, cancel: someone else used this browser, and you should upload from a private window instead.`
+      : `This removes your row from the Benchmark ${bench} ladder. You can upload a new file at any time.`;
     el.deleteDialog.showModal();
   }
   async function deleteMine() {
