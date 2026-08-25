@@ -25,6 +25,8 @@ import json
 import mimetypes
 import os
 import secrets
+import re
+import socket
 import sys
 import time
 import urllib.error
@@ -45,11 +47,24 @@ UPLOAD = [  # (directory or file relative to ROOT, recursive)
     "workshop/data/_instructor/test_labels_a.tsv", "workshop/data/_instructor/test_labels_b.tsv",
 ]
 SKIP_DIRS = {"__pycache__", ".git", "node_modules", "_instructor"}
+# Editor and tool leftovers. An interrupted `sed -i` once left a half-written
+# copy of app.js in static/, and the deployer served it publicly.
+SKIP_FILE = re.compile(r"^(sed[A-Za-z0-9]{6}|\..*\.sw[a-z]|.*~|\.DS_Store|.*\.orig|.*\.rej|.*\.tmp|.*\.bak)$")
 
 
 # ----------------------------------------------------------------------------
 # tiny API client (urllib only)
 # ----------------------------------------------------------------------------
+def _throttle_delay(body: bytes, attempt: int) -> int:
+    """PythonAnywhere answers 429 with {"detail": "... available in N seconds."}."""
+    try:
+        detail = json.loads(body.decode(errors="replace")).get("detail", "")
+    except (ValueError, AttributeError):
+        detail = ""
+    m = re.search(r"(\d+)\s*second", detail)
+    return min(int(m.group(1)) + 2 if m else 5 * (attempt + 1), 90)
+
+
 class PA:
     def __init__(self, host: str, username: str, token: str, verbose: bool = True):
         self.base = HOSTS.get(host, host).rstrip("/")
@@ -58,7 +73,8 @@ class PA:
         self.api = f"{self.base}/api/v0/user/{username}"
         self.verbose = verbose
 
-    def _request(self, method: str, url: str, data: bytes | None = None, headers: dict | None = None):
+    def _request(self, method: str, url: str, data: bytes | None = None, headers: dict | None = None,
+                 _attempt: int = 0):
         req = urllib.request.Request(url, data=data, method=method,
                                      headers={"Authorization": f"Token {self.token}", **(headers or {})})
         try:
@@ -66,9 +82,35 @@ class PA:
                 body = resp.read()
                 return resp.status, body
         except urllib.error.HTTPError as e:
-            return e.code, e.read()
+            body = e.read()
+            # PythonAnywhere throttles the API. Losing the last call means the
+            # code is uploaded but the web app never reloads, which leaves new
+            # static files running against old server code: wait and retry.
+            if e.code == 429 and _attempt < 4:
+                delay = _throttle_delay(body, _attempt)
+                if self.verbose:
+                    print(f"   throttled, retrying in {delay}s …")
+                time.sleep(delay)
+                return self._request(method, url, data, headers, _attempt + 1)
+            return e.code, body
         except urllib.error.URLError as e:
+            # A reload restarts the workers and can outlast the socket timeout.
+            # Treat a timeout as "probably fine, verify below" rather than a
+            # crash: exiting here skips the reload and leaves new static files
+            # running against old server code.
+            if isinstance(e.reason, TimeoutError) or isinstance(e, socket.timeout):
+                if _attempt < 2:
+                    print(f"   {url.rsplit('/', 2)[-2]} timed out, retrying …")
+                    return self._request(method, url, data, headers, _attempt + 1)
+                print(f"   WARNING: {url} timed out; the call may still have succeeded.")
+                return 599, b'{"detail": "client timeout"}'
             sys.exit(f"Network error talking to {url}: {e.reason}")
+        except TimeoutError:
+            if _attempt < 2:
+                print("   read timed out, retrying …")
+                return self._request(method, url, data, headers, _attempt + 1)
+            print(f"   WARNING: {url} timed out; the call may still have succeeded.")
+            return 599, b'{"detail": "client timeout"}'
 
     def call(self, method: str, path: str, payload: dict | None = None, ok=(200, 201)):
         url = self.api + path
@@ -107,12 +149,23 @@ def collect_files() -> list[tuple[Path, str]]:
             files.append((p, item))
         elif p.is_dir():
             for f in sorted(p.rglob("*")):
-                if f.is_file() and not (SKIP_DIRS & set(f.relative_to(ROOT).parts)) and f.suffix != ".pyc":
+                if (f.is_file() and not (SKIP_DIRS & set(f.relative_to(ROOT).parts))
+                        and f.suffix != ".pyc" and not SKIP_FILE.match(f.name)):
                     files.append((f, f.relative_to(ROOT).as_posix()))
     return files
 
 
-def wsgi_source(project_dir: str, admin_key: str) -> str:
+def edit_password() -> str:
+    """The /admin editor password. Kept out of the repository (it is public):
+    deploy/.edit_password is git-ignored and is injected into the WSGI file."""
+    f = ROOT / "deploy" / ".edit_password"
+    try:
+        return f.read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+
+
+def wsgi_source(project_dir: str, admin_key: str, edit_pw: str = "") -> str:
     return f'''# WSGI entry point for the Ostr-AI leaderboard (generated by deploy/deploy_pythonanywhere.py)
 import os, sys
 PROJECT = {project_dir!r}
@@ -120,6 +173,7 @@ if PROJECT not in sys.path:
     sys.path.insert(0, PROJECT)
 os.environ.setdefault("LEADERBOARD_DB", PROJECT + "/data/leaderboard.json")
 os.environ.setdefault("LEADERBOARD_ADMIN_KEY", {admin_key!r})
+os.environ.setdefault("LEADERBOARD_EDIT_PASSWORD", {edit_pw!r})
 from app import app as application  # noqa: E402
 '''
 
@@ -220,7 +274,7 @@ def main() -> int:
     print("✔ web app configured (source directory, HTTPS)")
 
     wsgi_path = f"/var/www/{domain.replace('.', '_')}_wsgi.py"
-    pa.upload(wsgi_path, wsgi_source(project_dir, admin_key).encode())
+    pa.upload(wsgi_path, wsgi_source(project_dir, admin_key, edit_password()).encode())
     print(f"✔ WSGI file written: {wsgi_path}")
 
     mappings = pa.call("GET", f"/webapps/{domain}/static_files/") or []

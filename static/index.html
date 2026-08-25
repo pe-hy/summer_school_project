@@ -3,8 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Ostr-AI 2026 · Leaderboard</title>
-  <meta name="description" content="Leaderboard for Fast and Accurate Text Classification, Ostr-AI AI Summer School 2026">
+  <title>Leaderboard · Ostr-AI AI Summer School 2026</title>
+  <meta name="description" content="Live standings for Fast and Accurate Text Classification, the final project of the Ostr-AI AI Summer School 2026: two benchmark ladders and the overall average.">
+  <meta name="color-scheme" content="light">
+  <!-- The host maps /static/ straight to the directory, so this file is also
+       reachable at /static/index.html. Name the one URL that counts. -->
+  <link rel="canonical" href="/">
   <link rel="icon" type="image/png" href="/static/favicon.png?v=__V__">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,28 +16,31 @@
   <link rel="stylesheet" href="/static/style.css?v=__V__">
 </head>
 <body>
+  <a class="skip-link" href="#main">Skip to the leaderboard</a>
   <header class="site-header">
     <div class="container header-inner">
-      <a class="brand" href="/">
+      <div class="brand">
         <img src="/static/logo.png?v=__V__" alt="" class="brand-logo" width="88" height="86">
         <div class="brand-text">
           <span class="brand-kicker">Ostr-AI · AI Summer School 2026</span>
           <h1 class="brand-title">Final Project Leaderboard</h1>
         </div>
-      </a>
-      <nav class="header-actions" aria-label="Actions">
-        <a class="btn btn-ghost" href="/assignment">Assignment</a>
-        <a class="btn btn-ghost" href="/guide">Submission guide</a>
+      </div>
+      <div class="header-actions">
+        <nav class="header-nav" aria-label="Main">
+          <a class="btn btn-ghost" href="/" aria-current="page">Leaderboard</a>
+          <a class="btn btn-ghost" href="/assignment">Assignment</a>
+          <a class="btn btn-ghost" href="/guide">Submission guide</a>
+        </nav>
         <button class="btn btn-primary" id="btn-open-upload" type="button">Upload predictions</button>
-      </nav>
+      </div>
     </div>
   </header>
 
-  <main class="container">
+  <main class="container" id="main" tabindex="-1">
     <section class="intro">
       <p>Fast and Accurate Text Classification: two benchmarks, each with its own ladder,
-        ranked by accuracy. The overall standing is the average of your two accuracies.
-        A skipped benchmark counts as 0.</p>
+        ranked by accuracy.</p>
       <p>You time your own system on a Colab T4, so the numbers are comparable.
         <a href="/assignment">Read the assignment</a></p>
     </section>
@@ -54,7 +61,7 @@
     <section id="overall" class="board-section">
       <div class="section-head">
         <h2>Overall standing</h2>
-        <p class="section-sub">Average of your two accuracies · a benchmark without a submission counts as 0</p>
+        <p class="section-sub">Average of your two accuracies</p>
       </div>
       <div class="table-card">
         <div class="table-scroll" tabindex="0" role="region" aria-label="Overall standing table">
@@ -83,12 +90,12 @@
             </tbody>
           </table>
         </div>
-        <p class="table-footnote">The final standing: the average of your two accuracies. A missing benchmark contributes 0.</p>
+        <p class="table-footnote">The board shows your score on part of the test set. The final ranking will be published in September.</p>
       </div>
     </section>
 
     <div class="bench-tabs" role="tablist" aria-label="Benchmarks">
-      <button type="button" role="tab" id="tab-a" aria-controls="benchmark-a" aria-selected="true">
+      <button type="button" role="tab" id="tab-a" aria-controls="benchmark-a" aria-selected="true" tabindex="0">
         Benchmark A <span class="tab-count" id="tab-count-a"></span></button>
       <button type="button" role="tab" id="tab-b" aria-controls="benchmark-b" aria-selected="false" tabindex="-1">
         Benchmark B <span class="tab-count" id="tab-count-b"></span></button>
@@ -101,13 +108,17 @@
     <div class="container">
       <span>Ostr-AI · AI Summer School 2026, Ostrava</span>
       <span class="footer-sep" aria-hidden="true">·</span>
-      <a href="/assignment">Assignment</a>
-      <span class="footer-sep" aria-hidden="true">·</span>
-      <a href="/guide">Submission guide</a>
-      <span class="footer-sep" aria-hidden="true">·</span>
-      <a href="/data/benchmarks.zip">data</a>
-      <span class="footer-sep" aria-hidden="true">·</span>
-      <a href="/examples/predictions.json">predictions.json</a>
+      <nav class="footer-nav" aria-label="Footer">
+        <a href="/" aria-current="page">Leaderboard</a>
+        <span class="footer-sep" aria-hidden="true">·</span>
+        <a href="/assignment">Assignment</a>
+        <span class="footer-sep" aria-hidden="true">·</span>
+        <a href="/guide">Submission guide</a>
+        <span class="footer-sep" aria-hidden="true">·</span>
+        <a href="/data/benchmarks.zip">Benchmark data (zip)</a>
+        <span class="footer-sep" aria-hidden="true">·</span>
+        <a href="/examples/predictions.json">predictions.json</a>
+      </nav>
     </div>
   </footer>
 
@@ -136,7 +147,7 @@
               <th scope="col" class="num" data-key="metric" aria-sort="none">
                 <button type="button" class="sort-btn"><span>Accuracy</span><span class="sort-icon" aria-hidden="true"></span></button>
               </th>
-              <th scope="col" class="num" data-key="latency_ms" aria-sort="none">
+              <th scope="col" class="num" data-key="average_time_per_example" aria-sort="none">
                 <button type="button" class="sort-btn"><span>Latency (ms/ex)</span><span class="sort-icon" aria-hidden="true"></span></button>
               </th>
               <th scope="col" class="col-date" data-key="submitted_at" aria-sort="none">
@@ -147,15 +158,15 @@
           <tbody></tbody>
         </table>
       </div>
-      <p class="table-footnote">Ranked by accuracy; equal accuracies share a rank.
+      <p class="table-footnote">Equal accuracies share a rank.
         Click a column header to sort.</p>
     </div>
     <div class="plot-card">
       <div class="plot-head">
         <div>
           <h3 class="plot-title">Accuracy vs. latency</h3>
-          <p class="plot-sub">Every dot is one result. Ladders rank by accuracy; the time is shown, not ranked.
-            Tick the boxes in the table to put names on the plots, or hover a dot.</p>
+          <p class="plot-sub">Every dot is one result. Latency is shown here, not ranked.
+            Tick a box in the table to put that name on both plots, or hover a dot.</p>
         </div>
         <button type="button" class="btn btn-ghost btn-sm btn-label-all" disabled>Show all names</button>
       </div>
@@ -176,17 +187,17 @@
       </header>
 
       <p class="dialog-hint">
-        One JSON file with your name, your measured speed, and a category for every
-        message in <code>test.tsv</code>. Both benchmarks go in the same file, and the
-        site scores it against the answer key.
-        Template: <a href="/examples/predictions.json">predictions.json</a>
-        · <a href="/guide" target="_blank" rel="noopener">guide</a>
-        · <a href="/assignment" target="_blank" rel="noopener">assignment</a>.      </p>
+        One JSON file with your name, your average time per example, and a category for every
+        message in <code>test.tsv</code>. Both benchmarks go in the same file.
+        Template (the shape only, not a file you can upload): <a href="/examples/predictions.json">predictions.json</a>
+        · <a href="/guide" target="_blank" rel="noopener">guide<span class="visually-hidden"> (opens in a new tab)</span></a>
+        · <a href="/assignment" target="_blank" rel="noopener">assignment<span class="visually-hidden"> (opens in a new tab)</span></a>.
+      </p>
 
       <label class="dropzone" id="dropzone" for="file-input">
-        <input type="file" id="file-input" class="visually-hidden" accept=".json,application/json">
+        <input type="file" id="file-input" class="visually-hidden" accept=".json,application/json" autofocus>
         <span class="dropzone-icon" aria-hidden="true">⬆</span>
-        <span class="dropzone-text"><strong>Choose a file</strong> or drag &amp; drop it here</span>
+        <span class="dropzone-text"><strong>Choose a file</strong> or drag and drop it here</span>
         <span class="dropzone-file" id="dropzone-file"></span>
       </label>
 
@@ -195,7 +206,7 @@
       <div id="warn-box" class="validation warn" hidden></div>
 
       <div id="preview-box" class="preview" hidden>
-        <h3>What was read</h3>
+        <h3>What the site read</h3>
         <div id="preview-entries"></div>
       </div>
 
@@ -213,13 +224,13 @@
   <dialog id="delete-dialog" class="dialog dialog-small" aria-labelledby="delete-title">
     <form method="dialog" class="dialog-form">
       <header class="dialog-header">
-        <h2 id="delete-title">Delete?</h2>
+        <h2 id="delete-title">Delete this result?</h2>
       </header>
       <p class="dialog-hint" id="delete-hint">This removes the result from the ladder. You can upload a new file at any time.</p>
       <footer class="dialog-footer">
         <span></span>
         <div class="dialog-buttons">
-          <button type="button" class="btn btn-ghost" id="btn-cancel-delete">Cancel</button>
+          <button type="button" class="btn btn-ghost" id="btn-cancel-delete" autofocus>Cancel</button>
           <button type="button" class="btn btn-danger" id="btn-confirm-delete">Delete</button>
         </div>
       </footer>

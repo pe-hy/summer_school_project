@@ -1,0 +1,11 @@
+id	text	intent
+602	cancel my reservation for dinner	cancel_reservation
+837	set a timer for 5 minutes	timer
+1129	what is the apr on my visa card	apr
+5316	what is the traffic like on the way to work	traffic
+8839	turn on the tv please	smart_home
+9599	use delta to book me a flight from dallas to pittsburgh	book_flight
+10079	is there a travel alert for canada	travel_alert
+12037	i need to book a car rental in boston	car_rental
+12860	how do i jump start my car battery	jump_start
+17524	where can i get a w2 form	w2

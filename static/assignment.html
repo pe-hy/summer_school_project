@@ -3,7 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Assignment · Ostr-AI 2026 Leaderboard</title>
+  <title>Assignment · Ostr-AI AI Summer School 2026</title>
+  <meta name="description" content="Fast and Accurate Text Classification: the task, the data, the labels and the rules for the Ostr-AI AI Summer School 2026 final project.">
+  <meta name="color-scheme" content="light">
+  <!-- Also reachable at /static/assignment.html, which the host serves directly. -->
+  <link rel="canonical" href="/assignment">
   <link rel="icon" type="image/png" href="/static/favicon.png?v=__V__">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -31,6 +35,7 @@
   </style>
 </head>
 <body>
+  <a class="skip-link" href="#main">Skip to content</a>
   <header class="site-header">
     <div class="container header-inner">
       <a class="brand" href="/">
@@ -40,13 +45,18 @@
           <p class="brand-title">Final Project Leaderboard</p>
         </div>
       </a>
-      <nav class="header-actions" aria-label="Actions">
-        <a class="btn btn-ghost" href="/">← Back to the leaderboard</a>
-      </nav>
+      <div class="header-actions">
+        <nav class="header-nav" aria-label="Main">
+          <a class="btn btn-ghost" href="/">Leaderboard</a>
+          <a class="btn btn-ghost" href="/assignment" aria-current="page">Assignment</a>
+          <a class="btn btn-ghost" href="/guide">Submission guide</a>
+        </nav>
+        <a class="btn btn-primary" href="/#upload">Upload predictions</a>
+      </div>
     </div>
   </header>
 
-  <main class="container guide">
+  <main class="container guide" id="main" tabindex="-1">
     <article class="guide-card" id="guide">
       <p>Loading the assignment…</p>
     </article>
@@ -56,7 +66,17 @@
     <div class="container">
       <span>Ostr-AI · AI Summer School 2026, Ostrava</span>
       <span class="footer-sep" aria-hidden="true">·</span>
-      <a href="/workshop/ASSIGNMENT.md">ASSIGNMENT.md (raw)</a>
+      <nav class="footer-nav" aria-label="Footer">
+        <a href="/">Leaderboard</a>
+        <span class="footer-sep" aria-hidden="true">·</span>
+        <a href="/assignment" aria-current="page">Assignment</a>
+        <span class="footer-sep" aria-hidden="true">·</span>
+        <a href="/guide">Submission guide</a>
+        <span class="footer-sep" aria-hidden="true">·</span>
+        <a href="/data/benchmarks.zip">Benchmark data (zip)</a>
+        <span class="footer-sep" aria-hidden="true">·</span>
+        <a href="/workshop/ASSIGNMENT.md">ASSIGNMENT.md (raw)</a>
+      </nav>
     </div>
   </footer>
 

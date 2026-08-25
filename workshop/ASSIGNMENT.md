@@ -2,19 +2,20 @@
 
 ## The task
 
-You get two collections of short customer service messages, Benchmark A and
-Benchmark B. For each one, build a system that reads a message and decides which
-category it belongs to. The data files call the categories "intents". For
-example, "I lost my card, what do I do?" belongs to the category
+You have two collections of short customer-service messages, Benchmark A and
+Benchmark B. For each collection, build a system that reads a message and
+decides which category it belongs to. The data files call the categories
+"intents". For example, "I lost my card, what do I do?" belongs to the class
 `lost_or_stolen_card`.
 
 |  | Benchmark A | Benchmark B |
 |---|---|---|
 | Categories | 77 | 150 |
-| Structure | one topic area | ten topic areas |
+| Topic areas | one | ten |
 | Training pool | 10,003 messages | 18,000 messages |
+| Test set | 3,080 messages | 4,500 messages |
 
-Build for both. They look similar but they do not behave the same.
+You should build two models. What works on Benchmark A may not carry over to Benchmark B.
 
 ## What you get
 
@@ -23,56 +24,55 @@ Per benchmark, in `benchmark_a/` and `benchmark_b/`:
 | File | Contents |
 |---|---|
 | `pool.tsv` | training messages, one per line, without labels |
+| `labeled_examples.tsv` | ten pool messages with their real labels, to show the format |
 | `intents.txt` | the category names, one per line |
-| `test.tsv` | the messages you are graded on, without categories |
+| `test.tsv` | the messages you are scored on, without labels |
 
 [Download the data](/data/benchmarks.zip)
 
 ## Labels
 
-The training pool is unlabeled on purpose. Producing labels is part of the
-project. Label a few hundred messages by hand, write rules, or use an LLM
-through OpenRouter to label the pool for you. How much you label and how much
-you trust the LLM is up to you.
+The data are given without labels. Producing them is part of the project, and an
+LLM on OpenRouter is the practical route, and manual supervision of label quality is necessary.
+
+The ten messages in `labeled_examples.tsv` are also in `pool.tsv`, under the
+same ids.
 
 Two rules:
 
-1. Do not look up the original datasets' labels online.
+1. Do not look up the original datasets' (or their labels) online.
 2. `test.tsv` is only for measuring. Never train on it and never let your
-   labeling pipeline see it.
+   labelling pipeline see it.
 
-You have no labels for `test.tsv` and you never will, so keep your own
-validation set: hold out part of the pool before you train and never train on it.
+Before you train, hold out part of your labelled pool. That is your validation
+set.
 
-Know what it measures. Those labels came from your own pipeline, so the number
-says how well your model agrees with your labels, not how often it is right. It
-will catch a broken run and separate two systems that differ a lot. It cannot
-settle a close call, and a model that copies every mistake in your labels scores
-100 percent on it. Hand-label some of the held-out messages yourself and you
-also learn how good your labels are, which is usually the thing worth improving.
-
-The leaderboard is the real test. It scores against the answer key, takes as
-many submissions as you like, shows you your score on part of the test set, and
-ranks you on the rest.
+Your score on it says how well your model agrees with your own labels. It does
+not say how often your model is right. It will catch a broken run and separate
+two systems that are far apart. Hand-label some
+of the held-out messages yourself and you learn something else: how good your
+own labels are. Label quality is usually what needs the work.
 
 ## What counts
 
-- **Accuracy**: we score it. You upload a category for every message in
-  `test.tsv` and the site checks it against the answer key.
-- **Average time per example**: you measure it. Load your model first, then
-  classify the test messages one at a time and divide the total time by their
-  count. Report the milliseconds. Run this on a Colab T4 so the numbers are
-  comparable.
+- **Accuracy**: the site scores it. You upload a category for every message in
+  `test.tsv`, and the site checks your categories against an answer key you
+  never see.
+- **Average time per example**: you measure it. Load your model before you start
+  the clock, classify the test messages one at a time, then divide the total
+  time by the number of messages. Report the result in milliseconds. Measure on
+  a Colab T4 so the numbers are comparable.
 
-When your system classifies, it runs locally: no API calls and no network access
-at that point. Use the LLM to label the pool beforehand, then train something of
-your own that stands on its own.
+Your system must run locally when it classifies: no API calls, no network
+access. Labelling the pool with an LLM is allowed, because it happens before
+classification.
 
 ## The leaderboard
 
-Upload one JSON file with your name, how fast your system ran, and a category
-for every message in `test.tsv`. Both benchmarks go in the same file. The `id`
-comes from `test.tsv`, and the category is spelled as in `intents.txt`.
+Upload one JSON file with your name, your average time per example, and a
+category for every message in `test.tsv`. Both benchmarks go in one file, and a
+file with only one of them is rejected. Take the `id` from `test.tsv` and spell
+the category exactly as in `intents.txt`.
 
 ```json
 [
@@ -83,10 +83,13 @@ comes from `test.tsv`, and the category is spelled as in `intents.txt`.
 ]
 ```
 
-Re-upload as often as you like. Ladders rank by accuracy, and the overall
-standing is the average of your two accuracies. A skipped benchmark counts as 0.
+The [submission guide](/guide) lists every field and shows how to build the file.
 
-The board scores you on part of the test set. The final ranking uses the part it
-does not show you, so tuning against the leaderboard buys you nothing.
+Re-upload as often as you like. Each ladder ranks by accuracy. Your time per
+example is shown beside it and plotted against it, but it does not change your
+rank. The overall standing averages your two accuracies.
+
+The board shows your score on part of the test set. The final ranking uses the
+part it does not show you, so tuning against the board buys you nothing.
 
 [Open the leaderboard](/)

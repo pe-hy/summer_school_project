@@ -14,21 +14,22 @@
   const CONFIG = {
     REFRESH_MS: 10000,
     MAX_NAME_LEN: 80,
-    MAX_ABS_NUMBER: 1e15,
+    MAX_TIME_MS: 1e7,         // mirrors app.py MAX_TIME_MS
     MAX_FILE_BYTES: 8 * 1024 * 1024,
     TEST_ROWS: { A: 3080, B: 4500 },
     LATENCY_FLOOR_MS: 0.01,   // clamp for the log axis only
   };
   const BENCHMARKS = [
-    { key: "A", label: "Benchmark A", sub: "77 intents · one service domain", dotClass: "" },
-    { key: "B", label: "Benchmark B", sub: "150 intents · ten service domains", dotClass: "bench-b" },
+    { key: "A", label: "Benchmark A", sub: "77 categories · one topic area", dotClass: "" },
+    { key: "B", label: "Benchmark B", sub: "150 categories · ten topic areas", dotClass: "bench-b" },
   ];
   const BENCH_KEYS = BENCHMARKS.map((b) => b.key);
 
-  const PRED_FIELDS = ["name", "benchmark", "average_time_per_example", "id", "intent"];
   const TIME_FIELD = "average_time_per_example";
 
   const TOKEN_KEY = "ostrai_owner_token";
+  const COOKIE_KEY = "ostrai_owner";   // server-set mirror of TOKEN_KEY; see getOwnerToken()
+  const VIEW_KEY = "ostrai_overall_view";
 
   // ---------------------------------------------------------------------------
   // DOM
@@ -44,6 +45,9 @@
     tabCounts: { A: $("#tab-count-a"), B: $("#tab-count-b") },
     overallTable: $("#table-overall"),
     overallBody: $("#table-overall-body"),
+    overallSub: $("#overall .section-sub"),
+    overallCard: $("#overall .table-card"),
+    overallFootnote: $("#overall .table-footnote"),
     btnOpenUpload: $("#btn-open-upload"),
     uploadDialog: $("#upload-dialog"),
     uploadTitle: $("#upload-title"),
@@ -67,6 +71,10 @@
     toast: $("#toast"),
   };
 
+  // The live wording, read from the markup so switching back restores it exactly.
+  const LIVE_SUB = el.overallSub.textContent;
+  const LIVE_FOOTNOTE = el.overallFootnote.textContent;
+
   // ---------------------------------------------------------------------------
   // State
   // ---------------------------------------------------------------------------
@@ -74,6 +82,8 @@
     rows: [],                       // all rows from the server
     ladders: { A: [], B: [] },      // ranked rows per benchmark
     overall: [],                    // ranked overall standings
+    final: null,                    // published final standings, null until /api/final answers 200
+    overallView: null,              // "final" | "live" once the reader (or storage) has picked
     mine: { A: null, B: null },     // this browser's row per benchmark
     labeled: new Set(),             // person_keys whose names show on BOTH plots
     seededSelf: false,
@@ -93,7 +103,15 @@
   const plots = {};                 // per-benchmark plot state {host, empty, tip, index, lastKey}
 
   // ---------------------------------------------------------------------------
-  // Identity (owner token in localStorage)
+  // Identity (owner token in localStorage, mirrored by a server-set cookie)
+  //
+  // Safari's tracking prevention deletes script-writable storage, localStorage
+  // included, after 7 days without a visit, which would orphan the student's
+  // submission. The server mirrors the token into the COOKIE_KEY cookie via a
+  // Set-Cookie header, which is not subject to that cap, so an empty
+  // localStorage is recovered from the cookie instead of minting a new
+  // identity. The cookie is never written from here: a cookie set by script
+  // would be capped at 7 days again, defeating the point.
   // ---------------------------------------------------------------------------
   function randomToken() {
     if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
@@ -102,17 +120,34 @@
     return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
   }
   const TOKEN_OK = (t) => typeof t === "string" && /^[A-Za-z0-9-]{16,64}$/.test(t);
+
+  // document.cookie is "a=1; b=2": split on ";", then on the FIRST "=" only
+  // (values may contain "="), and compare the trimmed name so that neither
+  // `not_ostrai_owner` nor `ostrai_owner_x` can pass for the real thing.
+  // Anything that is not a well-formed token is ignored, never sent onward.
+  function cookieToken() {
+    let raw;
+    try { raw = document.cookie; } catch (_) { return null; }
+    if (typeof raw !== "string") return null;
+    for (const part of raw.split(";")) {
+      const eq = part.indexOf("=");
+      if (eq < 0 || part.slice(0, eq).trim() !== COOKIE_KEY) continue;
+      const value = part.slice(eq + 1).trim();
+      if (TOKEN_OK(value)) return value;
+    }
+    return null;
+  }
+
   let storageOk = true;
   function getOwnerToken() {
     let token = null;
     try { token = localStorage.getItem(TOKEN_KEY); } catch (_) { storageOk = false; }
-    if (!TOKEN_OK(token)) {
-      token = randomToken();
-      try {
-        localStorage.setItem(TOKEN_KEY, token);
-        storageOk = localStorage.getItem(TOKEN_KEY) === token;
-      } catch (_) { storageOk = false; }
-    }
+    if (TOKEN_OK(token)) return token;
+    token = cookieToken() || randomToken();
+    try {
+      localStorage.setItem(TOKEN_KEY, token);
+      storageOk = localStorage.getItem(TOKEN_KEY) === token;
+    } catch (_) { storageOk = false; }
     return token;
   }
   const OWNER_TOKEN = getOwnerToken();
@@ -151,7 +186,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Parsing: CSV / JSON  ->  1-2 entries with the canonical keys
+  // Parsing: JSON  ->  1-2 entries with the canonical keys
   // ---------------------------------------------------------------------------
   const stripBOM = (s) => s.replace(/^\uFEFF/, "");
   const normalizeHeader = (h) => stripBOM(String(h)).toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -164,7 +199,7 @@
     intent: "intent", label: "intent", category: "intent", prediction: "intent", predictedintent: "intent",
   };
   const OLD_SCHEMA = new Set(["metric", "accuracy", "acc", "avgtimes"]);
-  const OLD_SCHEMA_MSG = "This looks like the old results format. Upload predictions now: one row per test message, with the columns name, benchmark, average_time_per_example, id and intent.";
+  const OLD_SCHEMA_MSG = "This looks like the old results format. The site now takes one entry per benchmark, each with name, benchmark, average_time_per_example and a predictions list of {id, intent}.";
 
   function normalizeBenchmark(v) {   // mirrors app.py normalize_benchmark
     if (typeof v !== "string") return null;
@@ -174,73 +209,6 @@
       if ([low, `benchmark${low}`, `bench${low}`, `project${low}`].includes(key)) return b;
     }
     return null;
-  }
-
-  function detectDelimiter(headerLine) {
-    let best = ",", bestCount = -1;
-    for (const d of [",", ";", "\t"]) {
-      const n = headerLine.split(d).length - 1;
-      if (n > bestCount) { best = d; bestCount = n; }
-    }
-    return best;
-  }
-
-  // Minimal RFC-4180 CSV parser (quotes, escaped quotes, CRLF).
-  function parseCSV(text, delimiter) {
-    const rows = [];
-    let row = [], field = "", inQuotes = false;
-    for (let i = 0; i < text.length; i++) {
-      const c = text[i];
-      if (inQuotes) {
-        if (c === '"') {
-          if (text[i + 1] === '"') { field += '"'; i++; } else { inQuotes = false; }
-        } else field += c;
-      } else if (c === '"') inQuotes = true;
-      else if (c === delimiter) { row.push(field); field = ""; }
-      else if (c === "\n" || c === "\r") {
-        if (c === "\r" && text[i + 1] === "\n") i++;
-        row.push(field); field = "";
-        rows.push(row); row = [];
-      } else field += c;
-    }
-    if (field !== "" || row.length > 0) { row.push(field); rows.push(row); }
-    return rows.filter((r) => r.some((v) => v.trim() !== ""));
-  }
-
-  function parseNumberString(raw) {
-    const s = String(raw).trim();
-    if (!/^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/.test(s)) return s;
-    return Number(s);
-  }
-
-  function rowsFromCSV(text) {
-    text = stripBOM(text);
-    const headerLine = text.split(/\r?\n/).find((l) => l.trim() !== "") || "";
-    const rows = parseCSV(text, detectDelimiter(headerLine));
-    if (rows.length === 0) return { errors: ["The file is empty."] };
-    if (rows.length < 2) return { errors: ["The file has a header but no predictions."] };
-
-    const header = rows[0].map((h) => h.trim());
-    const keys = header.map((h) => {
-      const norm = normalizeHeader(h);
-      return CANONICAL_BY_NORMALIZED[norm] || (OLD_SCHEMA.has(norm) ? "__old__" : null);
-    });
-    if (keys.includes("__old__")) return { errors: [OLD_SCHEMA_MSG] };
-    const missing = PRED_FIELDS.filter((f) => !keys.includes(f));
-    if (missing.length) {
-      return { errors: [`Missing column(s): ${missing.join(", ")}. The file needs ${PRED_FIELDS.join(", ")}.`] };
-    }
-    const out = [];
-    for (let r = 1; r < rows.length; r++) {
-      const values = rows[r];
-      if (values.length !== header.length) {
-        return { errors: [`Row ${r} has ${values.length} value(s) but the header has ${header.length} column(s).`] };
-      }
-      const obj = {};
-      keys.forEach((k, i) => { if (k) obj[k] = values[i].trim(); });
-      out.push(obj);
-    }
-    return { rows: out, errors: [] };
   }
 
   function rowsFromJSON(text) {
@@ -258,12 +226,17 @@
         if (norm === "predictions") { obj.predictions = v; continue; }
         const key = CANONICAL_BY_NORMALIZED[norm];
         if (!key) { if (OLD_SCHEMA.has(norm)) sawOld = true; continue; }
+        // The canonical spelling always wins; a synonym only fills an empty slot.
+        // Otherwise {"intent": x, "label": y} would silently submit y, and which
+        // one won would depend on the order of the keys in the file.
+        if (obj[key] !== undefined && norm !== normalizeHeader(key)) continue;
         obj[key] = typeof v === "string" ? v.trim() : v;
       }
       return { obj, sawOld };
     };
 
     const out = [];
+    const entryBenches = new Set();
     for (const item of data) {
       if (item === null || typeof item !== "object" || Array.isArray(item)) {
         return { errors: ["Every entry must be an object."] };
@@ -271,6 +244,13 @@
       const { obj, sawOld } = canon(item);
       if (Array.isArray(obj.predictions)) {
         // nested shape: one object per benchmark, carrying its own prediction list
+        const entryBench = normalizeBenchmark(String(obj.benchmark ?? ""));
+        if (entryBench) {
+          if (entryBenches.has(entryBench)) {
+            return { errors: ["Both results are for the same benchmark. One must be A and one B."] };
+          }
+          entryBenches.add(entryBench);
+        }
         for (const p of obj.predictions) {
           if (p === null || typeof p !== "object" || Array.isArray(p)) {
             return { errors: ["Every prediction must be an object with id and intent."] };
@@ -280,10 +260,20 @@
         }
       } else {
         if (sawOld && obj.id === undefined) return { errors: [OLD_SCHEMA_MSG] };
+        // Neither a nested entry nor a flat prediction row: most often the
+        // "predictions" key is misspelled, or it holds an object instead of a list.
+        if (obj.id === undefined && obj.benchmark !== undefined) {
+          return { errors: ['Each entry needs a "predictions" list, like [{"id": 1, "intent": "card_arrival"}].'] };
+        }
+        const flatBench = normalizeBenchmark(String(obj.benchmark ?? ""));
+        if (flatBench) entryBenches.add(flatBench);
         out.push(obj);
       }
     }
-    return { rows: out, errors: [] };
+    // Return the benchmarks the file DECLARES, not the ones that happened to
+    // yield rows. An entry with an empty or unparsed prediction list still
+    // counts as present, or we would tell the student to add it again.
+    return { rows: out, benches: [...entryBenches], errors: [] };
   }
 
   // Group prediction rows per benchmark. The file carries everything the server
@@ -292,36 +282,81 @@
     const lower = fileName.toLowerCase();
     let parsed;
     if (lower.endsWith(".json")) parsed = rowsFromJSON(text);
-    else if (lower.endsWith(".csv") || lower.endsWith(".tsv")) parsed = rowsFromCSV(text);
-    else return { clean: null, errors: ["Upload the .json file you produced. CSV also works if it has the columns name, benchmark, average_time_per_example, id and intent."] };
+    else return { clean: null, errors: ["Upload the .json file you produced. The site takes one JSON file holding both benchmarks."] };
     if (!parsed.rows) return { clean: null, errors: parsed.errors };
+    const declared = new Set(parsed.benches || []);
 
     const byBench = {};
     const errors = [];
     const badBench = new Set();
-    const names = new Set();
+    const names = new Map();   // NFKC-casefolded key -> the first spelling seen
+    let fatal = false;
     for (const row of parsed.rows) {
+      // Read the name before anything else. It is a fact about the whole file,
+      // so a row that fails below must not also make the file look nameless.
+      if (row.name !== undefined && String(row.name).trim()) {
+        const spelling = String(row.name).trim().replace(/\s+/g, " ");
+        const key = spelling.normalize("NFKC").toLowerCase();   // mirrors app.py person_key
+        if (!names.has(key)) names.set(key, spelling);
+      }
       const bench = normalizeBenchmark(String(row.benchmark ?? ""));
       if (!bench) { badBench.add(String(row.benchmark ?? "(empty)").slice(0, 20)); continue; }
-      const id = Number(row.id);
-      if (!Number.isInteger(id)) { errors.push(`Benchmark ${bench}: '${row.id}' is not a whole-number id.`); break; }
-      const intent = String(row.intent ?? "").trim();
-      if (!intent) { errors.push(`Benchmark ${bench}: id ${id} has no intent.`); break; }
       const group = byBench[bench] || (byBench[bench] = { predictions: [], times: new Set() });
-      group.predictions.push({ id, intent });
-      if (row.name !== undefined && String(row.name).trim()) names.add(String(row.name).trim().replace(/\s+/g, " "));
       if (row[TIME_FIELD] !== undefined && String(row[TIME_FIELD]).trim() !== "") {
         group.times.add(String(row[TIME_FIELD]).trim().replace(",", "."));
       }
+      const id = Number(row.id);
+      if (!Number.isInteger(id)) { errors.push(`Benchmark ${bench}: '${row.id}' is not a whole-number id.`); fatal = true; break; }
+      const maxId = CONFIG.TEST_ROWS[bench];
+      if (id < 1 || (maxId && id > maxId)) {
+        errors.push(`Benchmark ${bench}: id ${id} is outside 1 to ${(maxId || 0).toLocaleString()}. The ids come from test.tsv and start at 1.`);
+        fatal = true; break;
+      }
+      const intent = String(row.intent ?? "").trim();
+      if (!intent) { errors.push(`Benchmark ${bench}: id ${id} has no intent.`); fatal = true; break; }
+      group.predictions.push({ id, intent });
+    }
+    // A row that failed above makes every later count unreliable, so stop here
+    // rather than adding invented "wrong number of predictions" errors on top.
+    // The both-benchmarks rule still applies though: report it now, or the
+    // student fixes the row, re-uploads and only then learns B is missing too.
+    if (fatal) {
+      const short = BENCH_KEYS.filter((b) => !declared.has(b));
+      if (short.length && short.length < BENCH_KEYS.length) {
+        errors.push(`The file covers Benchmark ${BENCH_KEYS.filter((b) => declared.has(b)).join(" and ")} only. One file holds both benchmarks: add an entry for Benchmark ${short.join(" and ")}.`);
+      }
+      return { clean: null, errors };
     }
     if (badBench.size) {
-      errors.push(`The benchmark column must say A or B, found ${[...badBench].slice(0, 3).map((b) => `'${b}'`).join(", ")}.`);
+      errors.push(`The benchmark field must say A or B, found ${[...badBench].slice(0, 3).map((b) => `'${b}'`).join(", ")}.`);
     }
     const benches = Object.keys(byBench).sort();
     if (!errors.length && !benches.length) errors.push("No predictions found in the file.");
+    // The file is the whole submission: one entry for A and one for B.
+    else if (!errors.length && declared.size < BENCH_KEYS.length) {
+      const present = BENCH_KEYS.filter((b) => declared.has(b));
+      const missing = BENCH_KEYS.filter((b) => !declared.has(b));
+      errors.push(`The file covers Benchmark ${present.join(" and ")} only. One file holds both benchmarks: add an entry for Benchmark ${missing.join(" and ")}.`);
+    }
+    // Declared but produced no rows: report the real problem, not a missing entry.
+    for (const bench of BENCH_KEYS) {
+      if (declared.has(bench) && !(bench in byBench)) {
+        const expected = CONFIG.TEST_ROWS[bench];
+        errors.push(`Benchmark ${bench}: 0 predictions, but test.tsv has ${(expected || 0).toLocaleString()} messages. Predict every row.`);
+      }
+    }
 
-    if (!names.size) errors.push("The file does not say who this is. Add a name column or field.");
-    else if (names.size > 1) errors.push(`The file carries more than one name: ${[...names].slice(0, 3).join(", ")}.`);
+    if (!names.size) errors.push('The file has no name in it. Add a "name" field to each entry.');
+    else if (names.size > 1) errors.push(`The file carries more than one name: ${[...names.values()].slice(0, 3).join(", ")}. Use one name for both benchmarks.`);
+    else {
+      const only = [...names.values()][0];
+      const length = Array.from(only).length;   // count characters, not UTF-16 units
+      if (length > CONFIG.MAX_NAME_LEN) {
+        errors.push(`The name is ${length} characters. Keep it to ${CONFIG.MAX_NAME_LEN} or fewer.`);
+      } else if (/[\p{Cc}\p{Cf}\p{Cs}\p{Co}]/u.test(only)) {
+        errors.push("The name contains invisible or control characters. Use plain text.");
+      }
+    }
 
     for (const bench of benches) {
       const group = byBench[bench];
@@ -339,11 +374,13 @@
         errors.push(`Benchmark ${bench}: ${TIME_FIELD} differs between rows (${[...group.times].slice(0, 3).join(", ")}). It is one number per benchmark.`);
       } else if (!Number.isFinite(Number([...group.times][0])) || Number([...group.times][0]) < 0) {
         errors.push(`Benchmark ${bench}: ${TIME_FIELD} must be a number of milliseconds, 0 or more.`);
+      } else if (Number([...group.times][0]) > CONFIG.MAX_TIME_MS) {
+        errors.push(`Benchmark ${bench}: ${TIME_FIELD} is ${[...group.times][0]} ms per message, which cannot be right. Report milliseconds, not seconds or nanoseconds.`);
       }
     }
     if (errors.length) return { clean: null, errors };
 
-    const name = [...names][0].slice(0, CONFIG.MAX_NAME_LEN);
+    const name = [...names.values()][0];
     return {
       clean: benches.map((bench) => ({
         name,
@@ -358,10 +395,10 @@
   // ---------------------------------------------------------------------------
   // Scoring & standings
   // ---------------------------------------------------------------------------
-  const fmtPct = (x) => (x === null || x === undefined) ? "—" : (x * 100).toFixed(2) + " %";
+  const fmtPct = (x) => (x === null || x === undefined) ? "–" : (x * 100).toFixed(2) + " %";
   const fmtLatency = (ms) => {
     const n = Number(ms);
-    if (!Number.isFinite(n)) return "—";
+    if (!Number.isFinite(n)) return "–";
     if (n === 0) return "0";
     return String(+n.toPrecision(3));
   };
@@ -662,6 +699,151 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Final standings
+  //
+  // /api/final answers 404 until the organisers publish, and while it does this
+  // whole block is inert: nothing is created and no wording is touched, so the
+  // page is the live board it has always been. Once it answers 200 the Overall
+  // section gains a button that switches between the published final standings
+  // (scored on the complete test set) and the live board (the public scores).
+  // The two benchmark ladders and the plots always stay live.
+  // ---------------------------------------------------------------------------
+  const FINAL_VIEW = "final";
+  const LIVE_VIEW = "live";
+  const FINAL_SUB = "Final standings · average of your two accuracies on the complete test set";
+  const LIVE_VIEW_SUB = "Live board · average of your two accuracies";
+  const FINAL_FOOTNOTE = "These are the final standings, scored on the complete test set.";
+
+  function readStoredView() {
+    try {
+      const v = localStorage.getItem(VIEW_KEY);
+      return v === FINAL_VIEW || v === LIVE_VIEW ? v : null;
+    } catch (_) { return null; }
+  }
+  function storeView(v) {
+    try { localStorage.setItem(VIEW_KEY, v); } catch (_) { /* blocked storage: the choice lasts the session */ }
+  }
+  // Only ever asked once something is published, so an unpublished page never
+  // reads storage for this. Published and unasked defaults to the final view.
+  function currentView() {
+    if (state.overallView === null) state.overallView = readStoredView() || FINAL_VIEW;
+    return state.overallView;
+  }
+  const showingFinal = () => !!state.final && currentView() === FINAL_VIEW;
+
+  const finiteOrNull = (v) => (typeof v === "number" && Number.isFinite(v)) ? v : null;
+
+  function fmtDay(iso) {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  }
+
+  // undefined = the answer told us nothing we can trust; keep what we have.
+  function normalizeFinal(data) {
+    if (!data || typeof data !== "object" || !Array.isArray(data.standings)) return undefined;
+    const rows = [];
+    for (const r of data.standings) {
+      if (!r || typeof r !== "object" || Array.isArray(r)) continue;
+      const rank = finiteOrNull(r.rank);
+      rows.push({
+        pk: typeof r.person_key === "string" ? r.person_key : "",
+        name: typeof r.name === "string" ? r.name : "",
+        accA: finiteOrNull(r.accA),
+        accB: finiteOrNull(r.accB),
+        accFinal: finiteOrNull(r.final),
+        rank: rank === null ? rows.length + 1 : rank,
+      });
+    }
+    return { publishedAt: typeof data.published_at === "string" ? data.published_at : "", rows };
+  }
+
+  // /api/final 404s until the organisers publish, and a 404 is logged by the
+  // browser console on every poll. Riding the 10 s cycle would double the
+  // request count and fill the console for weeks, so after a few consecutive
+  // 404s the probe drops to one refresh in FINAL_PROBE_EVERY (about a minute);
+  // the first answer that is not a 404 puts it straight back on every cycle.
+  const FINAL_404_GRACE = 3;        // fast polls before backing off
+  const FINAL_PROBE_EVERY = 6;      // 6 x REFRESH_MS = ~1 min while backed off
+  let final404s = 0;                // consecutive "not published" answers
+  let finalSkips = 0;               // refreshes since the last backed-off probe
+
+  function probeFinal() {
+    if (final404s < FINAL_404_GRACE) { finalSkips = 0; return true; }
+    if (++finalSkips < FINAL_PROBE_EVERY) return false;
+    finalSkips = 0;
+    return true;
+  }
+
+  // Never rejects: 404 means "not published", anything else means "no news".
+  async function fetchFinal() {
+    try {
+      const data = normalizeFinal(await api("GET", "/api/final"));
+      final404s = 0;                // answering again: back on the fast cycle
+      return data;
+    } catch (err) {
+      if (err.status === 404) { final404s++; return null; }
+      return undefined;
+    }
+  }
+
+  // The published rows in the shape the Overall table already renders.
+  function finalTableRows() {
+    const mine = new Set();
+    for (const bench of BENCH_KEYS) {
+      const row = state.mine[bench];
+      if (row && row.person_key) mine.add(row.person_key);
+    }
+    return state.final.rows.map((r) => ({ ...r, mine: mine.has(r.pk) }));
+  }
+
+  let finalHead = null;             // the card-head holding the toggle, once published
+  let btnFinalView = null;
+
+  function buildFinalToggle() {
+    btnFinalView = document.createElement("button");
+    btnFinalView.type = "button";
+    btnFinalView.id = "btn-final-view";
+    btnFinalView.className = "btn btn-ghost btn-sm";
+    btnFinalView.addEventListener("click", () => {
+      state.overallView = showingFinal() ? LIVE_VIEW : FINAL_VIEW;
+      storeView(state.overallView);
+      applyOverallView();
+      renderOverallTable();
+      renderMyStatus();           // the strip quotes the view, so it flips too
+    });
+    finalHead = document.createElement("div");
+    finalHead.className = "card-head";
+    // .card-head is `justify-content: space-between`; the ladder heads pair a
+    // leading note with trailing buttons, so a lone button would sit left. An
+    // empty leading note keeps the same structure and puts the button right.
+    const headSpacer = document.createElement("span");
+    headSpacer.className = "card-head-note";
+    finalHead.append(headSpacer, btnFinalView);
+    // the strip goes above the table; the overall card has no head of its own
+    el.overallCard.replaceChildren(finalHead, ...el.overallCard.childNodes);
+  }
+
+  function applyOverallView() {
+    if (!state.final) {
+      if (!finalHead) return;       // nothing published, nothing ever touched
+      finalHead.remove();           // published, then withdrawn: put the page back
+      finalHead = btnFinalView = null;
+      el.overallSub.textContent = LIVE_SUB;
+      el.overallFootnote.textContent = LIVE_FOOTNOTE;
+      return;
+    }
+    if (!finalHead) buildFinalToggle();
+    const final = showingFinal();
+    const day = fmtDay(state.final.publishedAt);
+    btnFinalView.textContent = final ? "Show the live board" : "Show the final standings";
+    el.overallSub.textContent = final ? FINAL_SUB : LIVE_VIEW_SUB;
+    el.overallFootnote.textContent = final
+      ? FINAL_FOOTNOTE + (day ? ` Published ${day}.` : "")
+      : LIVE_FOOTNOTE;
+  }
+
+  // ---------------------------------------------------------------------------
   // Tables
   // ---------------------------------------------------------------------------
   function td(className, text) {
@@ -723,7 +905,7 @@
     if (!rows.length) {
       const tr = document.createElement("tr");
       tr.className = "placeholder-row";
-      const cell = td(null, `No results on Benchmark ${bench} yet. Be the first to upload one.`);
+      const cell = td(null, `No results on Benchmark ${bench} yet.`);
       cell.colSpan = 6;
       tr.appendChild(cell);
       frag.appendChild(tr);
@@ -767,8 +949,9 @@
   function renderOverallTable() {
     const view = state.views.overall;
     if (el.overallBody.contains(document.activeElement)) return;
-    const rows = sortView(state.overall, view);
-    const key = `${view.sortKey}|${view.sortDir}|` +
+    const final = showingFinal();
+    const rows = sortView(final ? finalTableRows() : state.overall, view);
+    const key = `${final ? "final" : "live"}|${view.sortKey}|${view.sortDir}|` +
       rows.map((r) => `${r.pk},${r.name},${r.accA},${r.accB},${r.accFinal},${r.rank},${r.mine ? 1 : 0}`).join(";");
     if (key === view.lastTableKey) return;
     view.lastTableKey = key;
@@ -777,7 +960,9 @@
     if (!rows.length) {
       const tr = document.createElement("tr");
       tr.className = "placeholder-row";
-      const cell = td(null, "The overall standing appears with the first result.");
+      const cell = td(null, final
+        ? "No final standings to show."
+        : "The overall standing appears with the first result.");
       cell.colSpan = 5;
       tr.appendChild(cell);
       frag.appendChild(tr);
@@ -848,18 +1033,29 @@
   // ---------------------------------------------------------------------------
   // Status panel: one slot per benchmark + overall line
   // ---------------------------------------------------------------------------
+  // Whatever the Overall table is showing, the strip quotes the same number:
+  // after publication that is the final standing, not the live public-slice one,
+  // so the two cannot contradict each other on screen. `finalTableRows()` marks
+  // "mine" exactly as the table does, and a withdrawal falls back to live.
   function myOverall() {
-    return state.overall.find((p) => p.mine) || null;
+    const rows = showingFinal() ? finalTableRows() : state.overall;
+    return rows.find((p) => p.mine) || null;
   }
 
   function renderMyStatus() {
-    if (el.myStatus.contains(document.activeElement)) return;
     const mA = state.mine.A, mB = state.mine.B;
     const ov = myOverall();
     const key = [mA && `${mA.id},${mA.metric},${mA.rank}`, mB && `${mB.id},${mB.metric},${mB.rank}`,
       ov && `${ov.rank},${ov.accFinal}`, storageOk].join("|");
     if (key === state.statusKey) return;
     state.statusKey = key;
+
+    // Rebuilding this box detaches whatever had focus, which would drop focus to
+    // <body>. A closing dialog also restores focus here. So remember which
+    // control was focused and put focus back on its replacement afterwards.
+    const active = document.activeElement;
+    const hadFocus = Boolean(active) && el.myStatus.contains(active);
+    const focusedAct = hadFocus ? (active.dataset && active.dataset.act) || "" : "";
 
     const box = el.myStatus;
     box.replaceChildren();
@@ -884,12 +1080,14 @@
           rep.type = "button";
           rep.className = "btn btn-ghost btn-sm";
           rep.textContent = "Replace";
-          rep.addEventListener("click", () => openUploadDialog());
+          rep.dataset.act = bench + ":replace";
+          rep.addEventListener("click", () => openUploadDialog(rep));
           const del = document.createElement("button");
           del.type = "button";
           del.className = "btn btn-ghost btn-sm";
           del.textContent = "Delete";
-          del.addEventListener("click", () => openDeleteDialog(bench));
+          del.dataset.act = bench + ":delete";
+          del.addEventListener("click", () => openDeleteDialog(bench, del));
           slot.append(rep, del);
         } else {
           const txt = document.createElement("span");
@@ -900,7 +1098,8 @@
           up.type = "button";
           up.className = "btn btn-ghost btn-sm";
           up.textContent = "Upload";
-          up.addEventListener("click", () => openUploadDialog());
+          up.dataset.act = bench + ":upload";
+          up.addEventListener("click", () => openUploadDialog(up));
           slot.appendChild(up);
         }
         box.appendChild(slot);
@@ -917,8 +1116,13 @@
     if (!storageOk) {
       const warn = document.createElement("span");
       warn.className = "storage-warning";
-      warn.textContent = "Your browser blocks site storage, so after a reload you will not be able to edit or delete your results.";
+      warn.textContent = "Your browser blocks site storage. After a reload you will not be able to edit or delete your results.";
       box.appendChild(warn);
+    }
+    if (hadFocus) {
+      const again = focusedAct && box.querySelector(`[data-act="${focusedAct}"]`);
+      const target = again || el.btnOpenUpload;
+      if (target && typeof target.focus === "function") target.focus();
     }
   }
 
@@ -938,8 +1142,15 @@
   async function refresh({ silent = true } = {}) {
     const seq = ++state.refreshSeq;
     try {
-      const data = await api("GET", "/api/submissions");
+      // The final standings ride the same cycle until they 404 often enough to
+      // be worth backing off from; fetchFinal never rejects, and a skipped probe
+      // reports undefined, which leaves whatever we already have alone.
+      const [data, final] = await Promise.all([
+        api("GET", "/api/submissions"),
+        probeFinal() ? fetchFinal() : Promise.resolve(undefined),
+      ]);
       if (seq !== state.refreshSeq) return;
+      if (final !== undefined) state.final = final;
       state.rows = (data.submissions || []).filter((r) => typeof r.metric === "number");
       for (const bench of BENCH_KEYS) {
         state.ladders[bench] = computeRanks(state.rows.filter((r) => r.benchmark === bench));
@@ -950,6 +1161,7 @@
       for (const pk of state.labeled) if (!alive.has(pk)) state.labeled.delete(pk);
       const myPk = (state.mine.A || state.mine.B || {}).person_key;
       if (!state.seededSelf && myPk) { state.labeled.add(myPk); state.seededSelf = true; }
+      applyOverallView();
       renderOverallTable();
       for (const bench of BENCH_KEYS) {
         renderLadderTable(bench);
@@ -958,6 +1170,16 @@
       renderMyStatus();
       renderStats();
       updateLabelAllButtons();
+      // Whether an upload replaces an existing result depends on the board. A
+      // dialog opened before the first load (the /#upload link on the guide and
+      // assignment pages) computed that against an empty board, so redo it.
+      if (el.uploadDialog.open && state.pending && !state.submitting) {
+        showPreview(state.pending);
+        el.btnSubmitUpload.textContent = submitLabel(state.pending);
+      }
+      // The first render pushes the tab strip down, so a deep link has to be
+      // re-aimed once the real rows are in.
+      if (deepLinkPending) { deepLinkPending = false; scrollToTabs(); }
     } catch (err) {
       if (seq !== state.refreshSeq) return;
       if (!silent) showToast(`Could not load the leaderboard: ${err.message}`, "error");
@@ -1005,12 +1227,42 @@
     el.uploadTitle.textContent = "Upload predictions";
     el.dialogNote.textContent = storageOk
       ? "Your browser remembers this upload so you can replace or delete it later."
-      : "Storage is blocked in this browser, so you will not be able to edit these results after a reload.";
+      : "This browser blocks site storage. After a reload you will not be able to edit or delete these results.";
   }
 
-  function openUploadDialog() {
+  // ---------------------------------------------------------------------------
+  // Dialog focus
+  //
+  // showModal() moves focus into the dialog and makes the rest of the page
+  // inert, so the trap and Escape come for free. What is not free is the way
+  // back: the spec restores focus to whatever was focused when the dialog
+  // opened, and that element is often gone by then, because the ten-second
+  // poll rebuilds the status bar the Replace / Delete / Upload buttons live in.
+  // A detached element is not focusable, so focus would fall to <body>. Each
+  // dialog therefore remembers its opener and falls back to a button that is
+  // always there.
+  // ---------------------------------------------------------------------------
+  function restoreFocus(opener, fallback) {
+    const target = (opener && document.body.contains(opener)) ? opener : fallback;
+    if (target && typeof target.focus === "function") target.focus();
+  }
+
+  // "Upload predictions" is a link on the guide and assignment pages, so the
+  // dialog has to be reachable by URL: /#upload. Closing it takes the fragment
+  // back out with replaceState, which leaves no extra Back step behind.
+  const UPLOAD_HASH = "#upload";
+  function dropUploadHash() {
+    if ((window.location.hash || "").toLowerCase() !== UPLOAD_HASH) return;
+    try {
+      history.replaceState(history.state, "", window.location.pathname + window.location.search);
+    } catch (_) { /* ignore */ }
+  }
+
+  let uploadOpener = null;
+  function openUploadDialog(opener) {
+    uploadOpener = opener || null;
     resetUploadDialog();
-    el.uploadDialog.showModal();
+    if (!el.uploadDialog.open) el.uploadDialog.showModal();
   }
 
   function showValidation(errors, { title = null, okMessage = "" } = {}) {
@@ -1035,21 +1287,10 @@
     el.warnBox.hidden = warnings.length === 0;
     if (!warnings.length) return;
     const heading = document.createElement("strong");
-    heading.textContent = "Worth a second look (you can still submit):";
+    heading.textContent = "Check this before you submit:";
     const ul = document.createElement("ul");
     for (const w of warnings) { const li = document.createElement("li"); li.textContent = w; ul.appendChild(li); }
     el.warnBox.append(heading, ul);
-  }
-
-  function collectWarnings(entries) {
-    const warnings = [];
-    if (entries.length === 1) {
-      const other = BENCH_KEYS.find((b) => b !== entries[0].benchmark);
-      if (!state.mine[other]) {
-        warnings.push(`This file covers Benchmark ${entries[0].benchmark} only. Benchmark ${other} still counts as 0 in the overall standing.`);
-      }
-    }
-    return warnings;
   }
 
   function showPreview(entries) {
@@ -1070,7 +1311,7 @@
       add("Name", e.name);
       add("Predictions", `${e.predictions.length.toLocaleString()} rows, ` +
         `${new Set(e.predictions.map((p) => p.intent)).size} distinct categories`);
-      add("Speed", `${fmtLatency(e[TIME_FIELD])} ms per message`);
+      add("Time per message", `${fmtLatency(e[TIME_FIELD])} ms`);
       wrap.appendChild(dl);
       const current = state.mine[e.benchmark];
       if (current) {
@@ -1090,7 +1331,7 @@
     state.pending = clean;
     const rows = clean.reduce((n, e) => n + e.predictions.length, 0);
     showValidation([], { okMessage: `Read ${rows.toLocaleString()} predictions. Press Submit and the site will score them.` });
-    showWarnings(collectWarnings(clean));
+    showWarnings([]);
     showPreview(clean);
     el.btnSubmitUpload.disabled = false;
     el.btnSubmitUpload.textContent = submitLabel(clean);
@@ -1155,11 +1396,13 @@
   // ---------------------------------------------------------------------------
   // Delete (per benchmark)
   // ---------------------------------------------------------------------------
-  function openDeleteDialog(bench) {
+  let deleteOpener = null;
+  function openDeleteDialog(bench, opener) {
+    deleteOpener = opener || null;
     state.deleteBench = bench;
     el.deleteTitle.textContent = `Delete your Benchmark ${bench} result?`;
     el.deleteHint.textContent = `This removes your row from the Benchmark ${bench} ladder (the other benchmark is untouched). You can upload a new file at any time.`;
-    el.deleteDialog.showModal();
+    if (!el.deleteDialog.open) el.deleteDialog.showModal();
   }
   async function deleteMine() {
     const bench = state.deleteBench;
@@ -1202,7 +1445,7 @@
       section.querySelector(".table-scroll").setAttribute("aria-label", `${bench.label} ladder table`);
       const btnUpload = section.querySelector(".ladder-upload");
       btnUpload.textContent = "Upload predictions";
-      btnUpload.addEventListener("click", () => openUploadDialog());
+      btnUpload.addEventListener("click", () => openUploadDialog(btnUpload));
       const dom = {
         section,
         tbody: section.querySelector("tbody"),
@@ -1244,9 +1487,23 @@
 
   // ---------------------------------------------------------------------------
   // Benchmark tabs (the Overall table stays pinned above them)
+  //
+  // URL policy: the address bar is written only by a real user action. Loading
+  // the page never rewrites it, so "/" stays "/". Clicking or arrowing to a tab
+  // is navigation a reader expects Back to undo, so it gets its own history
+  // entry via pushState and popstate/hashchange put the widget back in sync.
   // ---------------------------------------------------------------------------
-  let activeTab = "A";
+  let activeTab = null;
+  const tabHash = (bench) => "#benchmark-" + bench.toLowerCase();
+  function benchFromHash(hash) {
+    const m = /^#benchmark-([a-z])$/i.exec(hash || "");
+    const key = m ? m[1].toUpperCase() : null;
+    return BENCH_KEYS.includes(key) ? key : null;   // #benchmark-z falls through
+  }
+
+  // Reflect a benchmark in the widget. Never touches history: callers decide.
   function activateTab(bench, focus) {
+    if (!BENCH_KEYS.includes(bench)) bench = BENCH_KEYS[0];
     activeTab = bench;
     for (const key of BENCH_KEYS) {
       const selected = key === bench;
@@ -1255,21 +1512,65 @@
       ladders[key].section.hidden = !selected;
     }
     if (focus) el.tabs[bench].focus();
-    try { history.replaceState(null, "", "#benchmark-" + bench.toLowerCase()); } catch (_) { /* ignore */ }
     renderPlot(bench);   // the panel was display:none, so its plot deferred
   }
+
+  // A user picked this tab: reflect it and record it in history.
+  function selectTab(bench, focus) {
+    const changed = bench !== activeTab;
+    activateTab(bench, focus);
+    if (!changed) return;   // re-clicking the open tab must not stack entries
+    try { history.pushState({ bench }, "", tabHash(bench)); } catch (_) { /* ignore */ }
+  }
+
+  // A deep link lands on a panel that was `hidden` while the browser did its
+  // own scroll-to-fragment, so the browser could not scroll to it. Do it here,
+  // once at boot and once more after the first data render moved things down.
+  let deepLinkPending = false;
+  function scrollToTabs() {
+    const tablist = $(".bench-tabs");
+    if (tablist && typeof tablist.scrollIntoView === "function") tablist.scrollIntoView({ block: "start" });
+  }
+
   function initTabs() {
     for (const key of BENCH_KEYS) {
-      el.tabs[key].addEventListener("click", () => activateTab(key, false));
+      el.tabs[key].addEventListener("click", () => selectTab(key, false));
       el.tabs[key].addEventListener("keydown", (e) => {
-        if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+        const i = BENCH_KEYS.indexOf(key);
+        const last = BENCH_KEYS.length - 1;
+        let next = null;
+        if (e.key === "ArrowRight") next = BENCH_KEYS[(i + 1) % BENCH_KEYS.length];
+        else if (e.key === "ArrowLeft") next = BENCH_KEYS[(i + last) % BENCH_KEYS.length];
+        else if (e.key === "Home") next = BENCH_KEYS[0];
+        else if (e.key === "End") next = BENCH_KEYS[last];
+        if (next === null) return;         // everything else keeps its default
         e.preventDefault();
-        const other = BENCH_KEYS[(BENCH_KEYS.indexOf(key) + 1) % BENCH_KEYS.length];
-        activateTab(other, true);
+        selectTab(next, true);             // focus follows selection
       });
     }
-    const fromHash = (window.location.hash || "").replace("#benchmark-", "").toUpperCase();
-    activateTab(BENCH_KEYS.includes(fromHash) ? fromHash : "A", false);
+
+    // Back / Forward, and any link or hand edit that changes the fragment.
+    const tablist = $(".bench-tabs");
+    const syncFromURL = () => {
+      // Follow focus only when the reader is already inside the tab strip, so
+      // selection and focus stay together there; a Back press from anywhere
+      // else on the page must not yank focus up to the tabs.
+      const inside = !!(tablist && tablist.contains(document.activeElement));
+      const bench = benchFromHash(window.location.hash);
+      if (bench) { activateTab(bench, inside); return; }
+      // Only an empty fragment means "the default tab". Other anchors
+      // (#overall, #main, #upload) are ordinary page anchors: leave the widget
+      // where the reader put it.
+      if (!window.location.hash) activateTab(BENCH_KEYS[0], inside);
+    };
+    window.addEventListener("popstate", syncFromURL);
+    window.addEventListener("hashchange", syncFromURL);
+
+    // First paint: read the URL, write nothing back to it. A missing or
+    // unknown fragment simply leaves the default tab selected.
+    const deep = benchFromHash(window.location.hash);
+    activateTab(deep || BENCH_KEYS[0], false);
+    if (deep) { deepLinkPending = true; scrollToTabs(); }
   }
 
   // ---------------------------------------------------------------------------
@@ -1278,9 +1579,18 @@
   function wireEvents() {
     wireSort(el.overallTable.querySelectorAll("th[data-key]"), "overall", renderOverallTable);
 
-    el.btnOpenUpload.addEventListener("click", () => openUploadDialog());
+    el.btnOpenUpload.addEventListener("click", () => openUploadDialog(el.btnOpenUpload));
     el.btnCloseUpload.addEventListener("click", () => el.uploadDialog.close());
     el.btnCancelUpload.addEventListener("click", () => el.uploadDialog.close());
+    el.uploadDialog.addEventListener("close", () => {
+      restoreFocus(uploadOpener, el.btnOpenUpload);
+      uploadOpener = null;
+      dropUploadHash();
+    });
+    el.deleteDialog.addEventListener("close", () => {
+      restoreFocus(deleteOpener, el.btnOpenUpload);
+      deleteOpener = null;
+    });
     el.btnSubmitUpload.addEventListener("click", submitPending);
     el.fileInput.addEventListener("change", () => {
       const file = el.fileInput.files[0];
@@ -1326,6 +1636,7 @@
   initLadders();
   wireEvents();
   initTabs();
+  if ((window.location.hash || "").toLowerCase() === UPLOAD_HASH) openUploadDialog(el.btnOpenUpload);
   renderMyStatus();
   refresh({ silent: false });
   scheduleRefresh();

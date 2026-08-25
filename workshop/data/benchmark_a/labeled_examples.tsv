@@ -1,0 +1,11 @@
+id	text	intent
+548	What is the charge for using a Top up card in the US?	top_up_by_card_charge
+867	Is there a fee to order a physical card?	order_physical_card
+1144	How do I verify the top-up card?	verify_top_up
+2559	How can I transfer money into my account?	transfer_into_account
+4215	My card payment has been declined, why?	declined_card_payment
+4996	What do I do if my card has been lost or stolen?	lost_or_stolen_card
+6718	I think my card has been compromised in some way.	compromised_card
+8091	I received the wrong amount of cash.	wrong_amount_of_cash_received
+8379	My transfer failed, why?	failed_transfer
+8906	Can I use a cheque to top up my account	top_up_by_cash_or_cheque

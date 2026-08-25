@@ -1,12 +1,11 @@
 # Submitting to the leaderboard
 
-You upload predictions. The site scores them against the answer key and puts the
-accuracy on the ladder.
+You upload predictions. The site scores them against the answer key and puts
+your accuracy on the ladder.
 
-## The file
+## The file you should submit
 
-One JSON file holding both benchmarks. Re-upload whenever you have something
-better.
+One JSON file holding both benchmarks.
 
 ```json
 [
@@ -28,20 +27,21 @@ better.
 ]
 ```
 
-| Field                      | Meaning                                              |
-|----------------------------|------------------------------------------------------|
-| `name`                     | your name, as it should appear on the board          |
-| `benchmark`                | `A` or `B`                                           |
-| `average_time_per_example` | milliseconds per message, the number you measured    |
-| `predictions`              | one `{id, intent}` for every row of that `test.tsv`  |
+| Field                      | Meaning                                                    |
+|----------------------------|------------------------------------------------------------|
+| `name`                     | your name, as it should appear on the board                |
+| `benchmark`                | `A` or `B`                                                 |
+| `average_time_per_example` | milliseconds per message, the number you measured          |
+| `predictions`              | one `{id, intent}` for every row of that benchmark's `test.tsv` |
 
-- `id` is the `id` column of that benchmark's `test.tsv`. They run 1 to 3,080 for
-  A and 1 to 4,500 for B, and both start at 1. Not the row number of your
-  dataframe.
-- One prediction per id, all of them. 3,080 for A, 4,500 for B.
+- `id` comes from that benchmark's `test.tsv`. Not from `pool.tsv`, and not from
+  the row number in your dataframe. The ids run 1 to 3,080 for A and 1 to 4,500
+  for B.
+- Predict every id once.
 - `intent` is copied exactly from `intents.txt`. `Card Arrival` is not
   `card_arrival`.
-- Use the same name in both entries. A file with two names is rejected.
+- A file carrying only one benchmark is rejected.
+- Use the same name for both benchmarks. A file with two names is rejected.
 
 Building the file from a dataframe of predictions:
 
@@ -64,26 +64,22 @@ with open("predictions.json", "w") as f:
 
 `int()` and `float()` matter: numpy types will not serialise.
 
-Template: [`predictions.json`](examples/predictions.json).
+Template: [`predictions.json`](/examples/predictions.json). It carries two
+predictions per benchmark to show the shape, so you cannot upload it as it
+stands. Yours needs every row of both test sets.
 
-The site checks your ids and your category names and tells you what is wrong. If
-it accepts the file, it shows your accuracy immediately. That number is your
-score on part of the test set; the final ranking uses the part you are not shown.
+The site checks your ids and your category names. If something is wrong, it
+tells you what. If it accepts the file, it shows your accuracy straight away.
+That is your score on part of the test set. The final ranking uses the part you
+are not shown (will be shown eventually...).
 
 ## Editing and deleting
 
-Your browser remembers your uploads, so you can re-upload as often as you like;
-a new file replaces the benchmarks it contains. You can also delete either
-benchmark. Switching browsers loses that link, so ask an organiser.
+Your browser remembers your uploads. A new file replaces both of your results,
+and you can delete either benchmark on its own. Only this browser remembers
+them, so if you switch browsers or clear its cookies and site data, ask an
+organiser to remove your old result.
 
-Each name appears once per benchmark. If your upload is refused with
-*"a submission under this name already exists"*, it was either you from another
-browser or a namesake. Either way, ask an organiser.
-
-## Common mistakes
-
-- Missing rows. Predict every message in `test.tsv`, not a sample.
-- Categories that are not in `intents.txt`, or reformatted (`Card Arrival`
-  instead of `card_arrival`).
-- Mixing up the ids: `id` comes from `test.tsv`, not from `pool.tsv`.
-- Latency in seconds. Report milliseconds per message.
+Each name belongs to one browser. If your upload is refused with *"A submission
+under the name ... already exists"*, either you uploaded it from another browser
+or someone else is using your name. Either way, ask an organiser.
