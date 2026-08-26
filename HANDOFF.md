@@ -300,11 +300,11 @@ logistic regression. The live **Baseline** rows, which must never be deleted:
 
 | id | benchmark | public | hidden | full | ms |
 |---|---|---|---|---|---|
-| `b9fcc1277c6c` | A | 67.37 % | 71.10 % | **69.61 %** | 6.99 |
-| `b28e8a04f3dd` | B | 82.33 % | 83.74 % | **83.18 %** | 7.67 |
+| `a3004745daf4` | A | 67.37 % | 71.10 % | **69.61 %** | 0.49 |
+| `7cab890cff8f` | B | 82.33 % | 83.74 % | **83.18 %** | 0.39 |
 
 Final (mean of the full scores): **76.39 %**. `person_key` `baseline`,
-`submitted_at` `2026-08-24T19:14:25+00:00`.
+`submitted_at` `2026-08-26T07:28:49+00:00`. Latencies are batch-64 medians (3 passes); the original 2026-08-24 rows were batch-1 (6.99 / 7.67 ms) and were replaced when the methodology changed.
 
 Note A's public score understates it by nearly four points, which is a good
 illustration of why the split exists: 1,232 rows carry about ±1.3 points of
