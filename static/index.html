@@ -40,11 +40,23 @@
 
   <main class="container" id="main" tabindex="-1">
     <section class="intro">
-      <p>Fast and Accurate Text Classification: two benchmarks, each with its own ladder,
-        ranked by accuracy.</p>
-      <p>You time your own system in batches of 64 on a Colab T4, so the numbers are comparable.
-        <a href="/assignment">Read the assignment</a></p>
-      <p>Submission deadline: <strong>10 September 2026</strong>.</p>
+      <div class="intro-text">
+        <p>Fast and Accurate Text Classification: two benchmarks, each with its own ladder,
+          ranked by accuracy.</p>
+        <p>You time your own system in batches of 64 on a Colab T4, so the numbers are comparable.
+          <a href="/assignment">Read the assignment</a></p>
+        <p>Submission deadline: <strong>10 September 2026</strong>.</p>
+      </div>
+      <aside class="countdown-card" id="countdown-card" aria-label="Time left until the submission deadline">
+        <span class="countdown-label" id="countdown-label">Submissions close in</span>
+        <div class="countdown" id="deadline-countdown" role="timer">
+          <span class="cd-cell"><strong id="cd-days">–</strong><small>days</small></span>
+          <span class="cd-cell"><strong id="cd-hours">–</strong><small>hrs</small></span>
+          <span class="cd-cell"><strong id="cd-mins">–</strong><small>min</small></span>
+          <span class="cd-cell"><strong id="cd-secs">–</strong><small>sec</small></span>
+        </div>
+        <span class="countdown-sub" id="countdown-sub">10 September 2026, midnight Czech time</span>
+      </aside>
     </section>
 
     <section class="status-bar">

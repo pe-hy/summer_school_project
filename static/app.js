@@ -1631,6 +1631,37 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Deadline countdown
+  // ---------------------------------------------------------------------------
+  // Submissions close at the end of 10 September 2026, Czech time. September is
+  // CEST (UTC+2), so local midnight is 22:00 UTC — one instant for everyone.
+  const DEADLINE_MS = Date.UTC(2026, 8, 10, 22, 0, 0);
+
+  function startCountdown() {
+    const card = $("#countdown-card");
+    const num = { d: $("#cd-days"), h: $("#cd-hours"), m: $("#cd-mins"), s: $("#cd-secs") };
+    if (!card || !num.d || !num.h || !num.m || !num.s) return;
+    const pad = (n) => String(n).padStart(2, "0");
+    let timer = null;
+    const tick = () => {
+      const left = Math.floor((DEADLINE_MS - Date.now()) / 1000);
+      if (left < 0) {
+        $("#countdown-label").textContent = "Submissions are closed";
+        $("#deadline-countdown").hidden = true;
+        $("#countdown-sub").textContent = "The deadline was 10 September 2026";
+        if (timer) clearInterval(timer);
+        return;
+      }
+      num.d.textContent = String(Math.floor(left / 86400));
+      num.h.textContent = pad(Math.floor(left / 3600) % 24);
+      num.m.textContent = pad(Math.floor(left / 60) % 60);
+      num.s.textContent = pad(left % 60);
+    };
+    tick();
+    if (Date.now() < DEADLINE_MS) timer = setInterval(tick, 1000);
+  }
+
+  // ---------------------------------------------------------------------------
   // Boot
   // ---------------------------------------------------------------------------
   initLadders();
@@ -1640,6 +1671,7 @@
   renderMyStatus();
   refresh({ silent: false });
   scheduleRefresh();
+  startCountdown();
   if (document.fonts) {
     const remeasure = () => { for (const bench of BENCH_KEYS) { plots[bench].lastKey = null; renderPlot(bench); } };
     if (document.fonts.ready && document.fonts.ready.then) document.fonts.ready.then(remeasure);
