@@ -1260,6 +1260,10 @@
 
   let uploadOpener = null;
   function openUploadDialog(opener) {
+    if (Date.now() >= DEADLINE_MS) {
+      showToast("Submissions closed on 10 September 2026.", "error");
+      return;
+    }
     uploadOpener = opener || null;
     resetUploadDialog();
     if (!el.uploadDialog.open) el.uploadDialog.showModal();
@@ -1649,6 +1653,10 @@
         $("#countdown-label").textContent = "Submissions are closed";
         $("#deadline-countdown").hidden = true;
         $("#countdown-sub").textContent = "The deadline was 10 September 2026";
+        if (el.btnOpenUpload) {
+          el.btnOpenUpload.disabled = true;
+          el.btnOpenUpload.title = "The deadline was 10 September 2026";
+        }
         if (timer) clearInterval(timer);
         return;
       }

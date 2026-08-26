@@ -63,6 +63,24 @@ EDIT_MAX_BYTES = 256 * 1024
 EDIT_MAX_TRIES = 8            # per IP, before a cool-off
 EDIT_COOLOFF_S = 300
 
+# Submissions close at the end of 10 September 2026, Czech time (CEST, UTC+2),
+# i.e. 2026-09-10T22:00:00Z — the same instant static/app.js counts down to
+# (DEADLINE_MS there; keep the two in sync). LEADERBOARD_DEADLINE overrides it
+# for tests: an ISO timestamp (naive means UTC), or empty to disable the cutoff.
+_deadline_env = os.environ.get("LEADERBOARD_DEADLINE")
+if _deadline_env is None:
+    DEADLINE = datetime(2026, 9, 10, 22, 0, 0, tzinfo=timezone.utc)
+elif _deadline_env.strip():
+    DEADLINE = datetime.fromisoformat(_deadline_env.strip())
+    if DEADLINE.tzinfo is None:
+        DEADLINE = DEADLINE.replace(tzinfo=timezone.utc)
+else:
+    DEADLINE = None
+
+
+def deadline_passed() -> bool:
+    return DEADLINE is not None and datetime.now(timezone.utc) >= DEADLINE
+
 # ----------------------------------------------------------------------------
 # Submission schema (keep in sync with static/app.js and submit_readme.md)
 # ----------------------------------------------------------------------------
@@ -658,6 +676,16 @@ def list_submissions():
 def upsert_my_submission():
     """Create or replace the caller's results. The body is an array with one
     entry per benchmark, so every upload rewrites both of the caller's rows."""
+    # After the deadline the board freezes for students: no new rows, no
+    # replacements. Owner self-deletion (DELETE /api/submissions/mine) stays
+    # open on purpose — it can only remove the caller's own rows, never add or
+    # improve one — and the X-Admin-Key routes are untouched, so organisers can
+    # still fix the board.
+    if deadline_passed():
+        return jsonify({"error": "Submissions are closed.",
+                        "details": ["The deadline was 10 September 2026, midnight Czech time. "
+                                    "The board is frozen; if your entry needs fixing, contact an organiser."]}), 403
+
     owner_hash = get_owner_hash()
     body = api_json_body()
     if body is BAD_JSON:
