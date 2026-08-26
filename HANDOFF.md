@@ -482,8 +482,9 @@ from reading the code.
 - **Public checkpoints exist for both corpora on HuggingFace.** A student who
   identifies the datasets can download a fine-tuned model and beat everyone. The
   rule forbids looking up labels, not weights.
-- **Latency methodology is loose**: no warmup, no `torch.cuda.synchronize()`, no
-  batch-size rule.
+- **Latency methodology** (tightened 2026-08-26): fixed batches of 64 with one
+  untimed warmup batch, harness shown in the assignment. Still no
+  `torch.cuda.synchronize()` requirement.
 - **Nobody has clicked the final-standings toggle in a real browser.** Every
   code path is verified under QuickJS, but a human should press it once before
   September.

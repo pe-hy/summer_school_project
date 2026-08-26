@@ -63,9 +63,9 @@ DRY_RUN_TRAIN_N = 200   # rows per benchmark for the dry run's pool subset
                          # 256 so training encodes in a single batch)
 DRY_RUN_TEST_N = 60     # rows per benchmark for the dry run's test subset
                          # (kept small: the notebook's own latency measurement
-                         # classifies these one message at a time, 3 passes,
-                         # plus a fixed 100-message warmup -- on a contended
-                         # shared CPU that is the slow part of the whole dry run)
+                         # classifies these in batches of 64, 3 passes, plus a
+                         # fixed 100-message warmup -- on a contended shared
+                         # CPU that is the slow part of the whole dry run)
 
 _PASS = "PASS"
 _FAIL = "FAIL"

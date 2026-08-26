@@ -31,7 +31,7 @@ One JSON file holding both benchmarks.
 |----------------------------|------------------------------------------------------------|
 | `name`                     | your name, as it should appear on the board                |
 | `benchmark`                | `A` or `B`                                                 |
-| `average_time_per_example` | milliseconds per message, the number you measured          |
+| `average_time_per_example` | milliseconds per example, measured in batches of 64 as the [assignment](/assignment) shows |
 | `predictions`              | one `{id, intent}` for every row of that benchmark's `test.tsv` |
 
 - `id` comes from that benchmark's `test.tsv`. Not from `pool.tsv`, and not from

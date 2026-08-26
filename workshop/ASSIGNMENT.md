@@ -59,9 +59,35 @@ own labels are. Label quality is usually what needs the work.
   `test.tsv`, and the site checks your categories against an answer key you
   never see.
 - **Average time per example**: you measure it. Load your model before you start
-  the clock, classify the test messages one at a time, then divide the total
-  time by the number of messages. Report the result in milliseconds. Measure on
-  a Colab T4 so the numbers are comparable.
+  the clock, classify the test messages in batches of a fixed size of 64, then
+  divide the total time by the number of messages. Report the result in
+  milliseconds. Measure on a Colab T4 so the numbers are comparable.
+
+This is the measurement, exactly:
+
+```python
+import time
+
+BATCH_SIZE = 64                       # fixed: everyone times with this batch size
+texts = test["text"].tolist()         # the whole test set, in order
+
+classify(texts[:BATCH_SIZE])          # warmup: one untimed batch, so one-off
+                                      # startup costs stay off the clock
+
+predictions = []
+start = time.perf_counter()
+for i in range(0, len(texts), BATCH_SIZE):
+    predictions.extend(classify(texts[i:i + BATCH_SIZE]))
+total_ms = (time.perf_counter() - start) * 1000.0
+
+average_time_per_example = total_ms / len(texts)   # the number you report
+```
+
+`classify` is your whole system, end to end, taking a list of messages and
+returning a category for each. The test sets do not divide evenly by 64, so the
+last batch is smaller; dividing by `len(texts)` handles that. The result is
+still average milliseconds per example, it is just measured in batches of 64
+instead of one message at a time.
 
 Your system must run locally when it classifies: no API calls, no network
 access. Labelling the pool with an LLM is allowed, because it happens before
