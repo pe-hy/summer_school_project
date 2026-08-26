@@ -7,6 +7,7 @@
   --teal-ink-hover: #055c5f;
   --teal-tint: #e6f6f7;
   --amber: #f6a609;        /* sun, right arc */
+  --amber-hover: #dd9504;  /* hover for the accent button, 6.5:1 with navy text */
   --amber-ink: #8a5a00;
   --amber-tint: #fff4dc;
   --blue: #0a7ecb;
@@ -173,6 +174,8 @@ main:focus { outline: none; }        /* the skip-link target, focused only by sc
 .btn-primary:hover:not(:disabled) { background: var(--teal-ink-hover); }
 .btn-ghost { background: transparent; color: var(--navy); border-color: var(--line-strong); }
 .btn-ghost:hover:not(:disabled) { background: var(--bg); border-color: var(--navy); }
+.btn-accent { background: var(--amber); color: var(--navy); }
+.btn-accent:hover:not(:disabled) { background: var(--amber-hover); }
 .btn-danger { background: var(--red); color: #fff; }
 .btn-danger:hover:not(:disabled) { background: var(--red-hover); }
 .btn-sm { padding: .35rem .7rem; font-size: .85rem; }
