@@ -15,7 +15,8 @@
     REFRESH_MS: 10000,
     MAX_NAME_LEN: 80,
     MAX_TIME_MS: 1e7,         // mirrors app.py MAX_TIME_MS
-    MAX_FILE_BYTES: 8 * 1024 * 1024,
+    // mirrors app.py MAX_CONTENT_LENGTH: the worst real file is 0.87 MB
+    MAX_FILE_BYTES: 2 * 1024 * 1024,
     TEST_ROWS: { A: 3080, B: 4500 },
     LATENCY_FLOOR_MS: 0.01,   // clamp for the log axis only
   };
@@ -88,6 +89,7 @@
     labeled: new Set(),             // person_keys whose names show on BOTH plots
     seededSelf: false,
     refreshSeq: 0,
+    pollAfter: 0,                   // ms timestamp the poll may resume at, after a 429
     fileSeq: 0,
     submitting: false,
     pending: null,                  // validated entries waiting for submit
@@ -179,6 +181,10 @@
       const err = new Error((data && data.error) || `Request failed (${res.status})`);
       err.status = res.status;
       err.details = (data && Array.isArray(data.details)) ? data.details : null;
+      // Only the server knows how long its window has left. Guarded because a
+      // Response without headers is a thing test doubles have.
+      const retry = res.headers && res.headers.get ? parseInt(res.headers.get("Retry-After"), 10) : NaN;
+      err.retryAfter = Number.isFinite(retry) && retry > 0 ? retry : null;
       throw err;
     }
     return data;
@@ -782,6 +788,10 @@
       return data;
     } catch (err) {
       if (err.status === 404) { final404s++; return null; }
+      // A 429 is the server asking for fewer requests, so asking again on the
+      // very next cycle is the one thing not to do. Back off the same way a
+      // 404 does, but keep whatever standings we already have.
+      if (err.status === 429) { final404s++; return undefined; }
       return undefined;
     }
   }
@@ -1178,6 +1188,11 @@
       if (deepLinkPending) { deepLinkPending = false; scrollToTabs(); }
     } catch (err) {
       if (seq !== state.refreshSeq) return;
+      // 429 means the server is busy and has told us how long for. Polling
+      // through that adds load to a site that is already struggling, so hold
+      // off for as long as it asked (a minute at most, so the board still
+      // comes back on its own).
+      if (err.status === 429) state.pollAfter = Date.now() + Math.min(err.retryAfter || 30, 60) * 1000;
       if (!silent) showToast(`Could not load the leaderboard: ${err.message}`, "error");
       else el.statUpdated.textContent = "offline";
     }
@@ -1185,6 +1200,7 @@
 
   function scheduleRefresh() {
     setInterval(() => {
+      if (Date.now() < state.pollAfter) return;
       if (document.visibilityState === "visible") refresh();
     }, CONFIG.REFRESH_MS);
   }
@@ -1626,7 +1642,7 @@
       resizeTimer = setTimeout(() => { for (const bench of BENCH_KEYS) renderPlot(bench); }, 150);
     });
     document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible") refresh();
+      if (document.visibilityState === "visible" && Date.now() >= state.pollAfter) refresh();
     });
   }
 

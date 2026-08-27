@@ -309,6 +309,62 @@ Do not relitigate these without a reason. Each cost a round of discussion.
   `workshop/data/README.md`. Both of those are instructor-only and git-ignored,
   so a public clone has the seed files but neither the builder nor the write-up.
 
+## Rate limiting
+
+Availability only. The goal is that one person running a loop cannot make the
+site slow or unreachable for everyone else. Nothing here is about scoring or
+about slowing down score probing.
+
+Two rules shape every number in `app.py`'s rate-limiting section:
+
+1. **Per caller is what refuses.** Each caller gets an address bucket and a
+   token bucket, and the tighter one bites. Students are on their own
+   connections, so an address is a person.
+2. **The global tiers are load shedding, not a wall.** A refused request stops
+   counting, so one flooder can no longer drive the counter everybody shares.
+   Over the soft budget only busy callers are refused. A hard backstop far
+   above anything a class produces refuses everyone, on a window of minutes so
+   it heals by itself.
+
+| path | per address | per token | global soft (sheds busy callers) | global hard |
+|---|---|---|---|---|
+| `GET /api/submissions`, `/mine`, `/api/final` | 600 / 60 s | 120 / 60 s | 2400 / 60 s, spares under 120 | 7200 / 60 s |
+| `PUT /api/submissions/mine` | 30 / 600 s, 90 / 3600 s, 2 s apart | 60 / 600 s | 600 / 300 s, spares under 8 | 1500 / 300 s |
+| `DELETE .../mine` | 20 / 600 s | 40 / 600 s | 150 / 300 s, spares under 6 | 400 / 300 s |
+| `GET /data/benchmarks.zip` | 40 / 3600 s | n/a | 400 / 600 s, spares under 5 | 900 / 600 s |
+| `DELETE /api/submissions/<id>` without the key | 10 / 900 s | n/a | none | none |
+
+`HEAD` is metered as `GET`: Flask runs the whole view and only throws the body
+away, so an unmetered `HEAD` is `curl -I` in a loop holding the database lock.
+
+`/admin` and every admin-keyed route are exempt, so the organiser cannot be
+locked out. Read buckets live in a per-process dict, so the ten second poll
+never touches the disk; write buckets live in `ratelimit.json` next to the
+database under a bounded flock, and a lock nobody can take falls back to
+counting in memory rather than waving the request through.
+
+Two env seams, both read at import, so changing one needs a WSGI edit on
+PythonAnywhere and not just a redeploy:
+
+- `LEADERBOARD_RATELIMIT=off` turns the whole thing off.
+- `LEADERBOARD_RATELIMIT_SCOPE=token` drops the address tiers, for the case
+  below.
+
+**Do this once, from outside, right after the deploy:**
+
+```bash
+curl -s -H "X-Admin-Key: $(cat deploy/.admin_key)" https://pehy.pythonanywhere.com/api/whoami
+```
+
+Compare `client_ip` with `remote_addr` and `x_forwarded_for`. `client_ip` is
+the LAST `X-Forwarded-For` entry, which is right only if PythonAnywhere's proxy
+appends the real peer. If two different machines come back with the same
+`client_ip`, the address tiers are pooling the whole class into one bucket:
+set `LEADERBOARD_RATELIMIT_SCOPE=token` in the WSGI file. Until that call is
+made this is measured by nobody. The address tiers are deliberately loose
+(600 board reads a minute) so that a wrong guess degrades rather than shuts
+the board.
+
 ## Reference numbers
 
 Trained on Haiku labels for a sample of the pool, MiniLM embeddings plus

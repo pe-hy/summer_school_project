@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import heapq
 import html as html_mod
 import io
 import hmac
@@ -92,7 +93,32 @@ FIELDS = STRING_FIELDS + ("benchmark", "predictions") + TIME_ALIASES
 MAX_TIME_MS = 1e7              # 10,000 s per message is beyond any real run
 MAX_NAME_LEN = 80
 MAX_ABS_NUMBER = 1e15          # anything bigger is certainly a mistake
-MAX_SUBMISSIONS = 500          # hard cap on rows (the API is unauthenticated)
+UNKNOWN_FIELDS_SHOWN = 10      # unknown field names echoed back before "...and N more"
+# A runaway guard, not a resource students compete for. At 500 a scripted
+# flood filled the board in seconds and every student who had not uploaded
+# yet was locked out while the already ranked never noticed. Cleaning up
+# afterwards is what POST /api/admin/bulk_delete is for.
+MAX_SUBMISSIONS = 5000         # hard cap on rows (the API is unauthenticated)
+# How many rows GET /api/submissions serves per benchmark. The row cap above
+# is measured in thousands, and serialising thousands of rows every ten
+# seconds for every open tab would be an outage of its own: 5000 rows is
+# 54.7 ms and 916 KB per poll against 5.8 ms and 91 KB at 500. This keeps the
+# cost of a poll bounded no matter how full the board gets. A real workshop
+# never comes near it, so nothing is ever trimmed in practice; if junk ever
+# does push past it, what falls off is the bottom of the ladder, and the
+# caller's own rows are kept whatever their rank.
+BOARD_ROWS_PER_BENCH = 400
+# Rows POST /api/admin/bulk_delete will never match, whatever the selectors
+# say. The reference entries on the live board are hand made and are not junk
+# anybody needs to sweep up, so a wide date selector must not be able to take
+# them with it. Removing one is still possible, by id, one at a time, with
+# DELETE /api/submissions/<id> and the admin key.
+PROTECTED_IDS = frozenset(
+    part for part in os.environ.get("LEADERBOARD_PROTECTED_IDS",
+                                    "a3004745daf4,7cab890cff8f").replace(" ", "").split(",") if part)
+# Above this many matched rows a confirmed bulk delete must also echo
+# expect=<matched count>, which only the dry run can tell you.
+BULK_DELETE_ECHO_OVER = 20
 TOKEN_MIN_LEN, TOKEN_MAX_LEN = 16, 64
 INVALID_CATEGORIES = {"Cc", "Cf", "Cs", "Co", "Cn"}   # Unicode general categories rejected in names
 
@@ -156,7 +182,12 @@ class AtomicJSONStorage(Storage):
 
 
 app = Flask(__name__, static_folder=None)
-app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024  # predictions for both test sets, with room to spare
+# The worst legitimate file is 3,080 + 4,500 predictions with the longest
+# category names, an 80 character name and pretty printing: 0.67 MB at
+# indent=2, 0.87 MB at indent=4. 2 MB is roughly triple that, and every
+# byte above it is a body a worker would read before it could refuse it.
+# Mirrored in static/app.js as CONFIG.MAX_FILE_BYTES; keep the two in sync.
+app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024
 app.json.sort_keys = False
 app.json.ensure_ascii = False
 
@@ -404,9 +435,17 @@ def validate_entry(data: object) -> tuple[dict | None, list[str]]:
         return None, ["Each result must be an object with name, benchmark, "
                       "average_time_per_example and predictions."]
 
-    unknown = sorted(str(k).encode("utf-8", "replace").decode("utf-8")[:40] for k in set(data) - set(FIELDS))
-    if unknown:
-        errors.append("Unexpected field(s): " + ", ".join(unknown))
+    extra = set(data) - set(FIELDS)
+    if extra:
+        # Echo a handful, never all of them. Naming every unknown key turned a
+        # body full of junk field names into a response several times its size,
+        # built and held in memory before anything else could be refused. Ten
+        # names still tell a student what is wrong with their file.
+        shown = sorted(str(k).encode("utf-8", "replace").decode("utf-8")[:40]
+                       for k in heapq.nsmallest(UNKNOWN_FIELDS_SHOWN, extra, key=str))
+        rest = len(extra) - len(shown)
+        errors.append("Unexpected field(s): " + ", ".join(shown)
+                      + (f" ...and {rest} more" if rest > 0 else ""))
 
     clean: dict = {}
     if "name" not in data:
@@ -664,11 +703,42 @@ def api_json_body() -> object:
 # ----------------------------------------------------------------------------
 # API
 # ----------------------------------------------------------------------------
+def board_slice(rows: list[dict]) -> list[dict]:
+    """The board as it is served: the top BOARD_ROWS_PER_BENCH of each
+    benchmark, plus every row belonging to the caller.
+
+    Untouched until the board holds more rows than that, which no workshop
+    does. It exists so that one poll can never cost more than a bounded amount
+    of work and bandwidth however many rows a flood managed to insert before
+    somebody cleaned up."""
+    if len(rows) <= len(BENCHMARKS) * BOARD_ROWS_PER_BENCH:
+        return rows
+
+    def rank_key(row: dict):
+        metric = row.get("metric")
+        return (-metric if isinstance(metric, (int, float)) else 1, row.get("submitted_at", ""))
+
+    kept: list[dict] = []
+    seen: set[int] = set()
+    for bench in BENCHMARKS:
+        ladder = sorted((r for r in rows if r.get("benchmark") == bench), key=rank_key)
+        for row in ladder[:BOARD_ROWS_PER_BENCH]:
+            kept.append(row)
+            seen.add(id(row))
+    # The caller has to see themselves whatever their score, and a row for a
+    # benchmark that is not on the board at all is nothing this can rank.
+    for row in rows:
+        if id(row) not in seen and (row.get("mine") or row.get("benchmark") not in BENCHMARKS):
+            kept.append(row)
+    return kept
+
+
 @app.get("/api/submissions")
 def list_submissions():
     owner_hash = get_owner_hash(required=False)
     with db_lock():
         rows = [public_row(doc, owner_hash) for doc in submissions.all()]
+    rows = board_slice(rows)
     return jsonify({"submissions": rows, "count": len(rows)})
 
 
@@ -767,23 +837,167 @@ def delete_my_submission(bench: str | None = None):
             abort(404, description="Unknown benchmark.")
         cond = cond & (Submission.benchmark == normalized)
     with db_lock():
-        removed = submissions.remove(cond)
-    if not removed:
-        return jsonify({"error": "You have no submission to delete."}), 404
+        # Search before removing. TinyDB's remove() rewrites and fsyncs the
+        # WHOLE database file even when its condition matched nothing, holding
+        # the lock that every board read also waits on. That made a delete with
+        # an invented token the cheapest way to make the site expensive, so a
+        # miss now costs one in-memory scan and touches no storage at all.
+        docs = submissions.search(cond)
+        if not docs:
+            return jsonify({"error": "You have no submission to delete."}), 404
+        submissions.remove(doc_ids=[d.doc_id for d in docs])
     return "", 204
+
+
+ADMIN_DENIED = {"error": "Admin key missing or wrong (set LEADERBOARD_ADMIN_KEY on the server)."}
+
+
+def admin_key_ok() -> bool:
+    """Constant-time X-Admin-Key check, shared by every organiser-only route."""
+    key = request.headers.get("X-Admin-Key", "")
+    return bool(ADMIN_KEY) and hmac.compare_digest(
+        key.encode("utf-8", "surrogateescape"), ADMIN_KEY.encode("utf-8"))
 
 
 @app.delete("/api/submissions/<submission_id>")
 def admin_delete_submission(submission_id: str):
     """Organiser escape hatch (e.g. a student lost their token). Needs LEADERBOARD_ADMIN_KEY."""
-    key = request.headers.get("X-Admin-Key", "")
-    if not ADMIN_KEY or not hmac.compare_digest(key.encode("utf-8", "surrogateescape"), ADMIN_KEY.encode("utf-8")):
-        return jsonify({"error": "Admin key missing or wrong (set LEADERBOARD_ADMIN_KEY on the server)."}), 403
+    if not admin_key_ok():
+        return jsonify(ADMIN_DENIED), 403
     with db_lock():
-        removed = submissions.remove(Submission.id == submission_id)
-    if not removed:
-        return jsonify({"error": "No submission with that id."}), 404
+        # Look first, for the same reason as the owner delete above: a delete
+        # for an id that is not there must not rewrite the whole database.
+        doc = submissions.get(Submission.id == submission_id)
+        if doc is None:
+            return jsonify({"error": "No submission with that id."}), 404
+        submissions.remove(doc_ids=[doc.doc_id])
     return "", 204
+
+
+@app.post("/api/admin/bulk_delete")
+def admin_bulk_delete():
+    """Organiser-only cleanup after a flood of junk rows. Needs LEADERBOARD_ADMIN_KEY.
+
+    Deleting by id one at a time is fine when a student loses their token and
+    useless against hundreds of scripted rows, which is why this exists. Three
+    things stand between it and an empty board, because a single unbounded
+    date selector matches every row there is:
+      * it is a DRY RUN by default and deletes nothing until the caller
+        repeats the request with confirm=yes
+      * a call with no selector at all is refused outright
+      * a confirmed run matching more than BULK_DELETE_ECHO_OVER rows must
+        also echo expect=<the matched count>, a number you can only get from
+        the dry run. Adding confirm=yes to a command line cannot do that, so
+        the big delete is always the second, deliberate call
+    PROTECTED_IDS are never in the match set: the reference rows are removed
+    by id with DELETE /api/submissions/<id>, one at a time, on purpose.
+
+    Selectors (JSON body or query string), combined with AND:
+      owner_prefix  leading hex characters of a row's owner_hash, 4 or more
+      since, until  ISO timestamps bounding submitted_at, inclusive
+    """
+    if not admin_key_ok():
+        return jsonify(ADMIN_DENIED), 403
+    body = api_json_body()
+    if not isinstance(body, dict):     # BAD_JSON, a bare list, or no body at all
+        body = {}
+
+    def arg(name: str):
+        value = body.get(name, request.args.get(name))
+        return value.strip() if isinstance(value, str) else value
+
+    owner_prefix = str(arg("owner_prefix") or "").lower()
+    since, until = str(arg("since") or ""), str(arg("until") or "")
+    confirm = str(arg("confirm") or "").strip().lower() in ("1", "true", "yes", "on")
+    raw_expect = arg("expect")
+    if raw_expect is None or str(raw_expect).strip() == "":
+        expect = None
+    else:
+        try:
+            expect = int(str(raw_expect).strip())
+        except ValueError:
+            expect = -1        # supplied but not a number: matches no count, so the run is refused
+
+    if owner_prefix and (len(owner_prefix) < 4 or any(c not in "0123456789abcdef" for c in owner_prefix)):
+        return jsonify({"error": "Invalid selector.",
+                        "details": ["owner_prefix must be at least 4 hex characters of an owner hash."]}), 400
+    bounds = {}
+    for label, value in (("since", since), ("until", until)):
+        if not value:
+            continue
+        try:
+            when = datetime.fromisoformat(value)
+        except ValueError:
+            return jsonify({"error": "Invalid selector.",
+                            "details": [f"'{label}' must be an ISO timestamp, "
+                                        "for example 2026-09-01T12:00:00+00:00."]}), 400
+        bounds[label] = when if when.tzinfo else when.replace(tzinfo=timezone.utc)
+    if not (owner_prefix or bounds):
+        return jsonify({"error": "No selector.",
+                        "details": ["Pass owner_prefix, since or until. This route refuses to "
+                                    "match every row on the board."]}), 400
+
+    def stamp(value: object) -> datetime | None:
+        try:
+            when = datetime.fromisoformat(str(value))
+        except (TypeError, ValueError):
+            return None
+        return when if when.tzinfo else when.replace(tzinfo=timezone.utc)
+
+    def selected(doc: dict) -> bool:
+        if owner_prefix and not str(doc.get("owner_hash", "")).startswith(owner_prefix):
+            return False
+        when = stamp(doc.get("submitted_at", ""))
+        if "since" in bounds and (when is None or when < bounds["since"]):
+            return False
+        if "until" in bounds and (when is None or when > bounds["until"]):
+            return False
+        return True
+
+    with db_lock():
+        total = len(submissions)
+        matched = [doc for doc in submissions.all() if selected(doc)]
+        hits = [d for d in matched if str(d.get("id", "")) not in PROTECTED_IDS]
+        kept = len(matched) - len(hits)
+        sample = [{"id": d.get("id"), "name": d.get("name", ""), "benchmark": d.get("benchmark"),
+                   "submitted_at": d.get("submitted_at", "")} for d in hits[:20]]
+        report = {"matched": len(hits), "sample": sample, "protected": kept, "rows": total}
+        if not confirm:
+            note = "Nothing was deleted. Repeat the call with confirm=yes to delete."
+            if len(hits) > BULK_DELETE_ECHO_OVER:
+                note = (f"Nothing was deleted. This matches {len(hits)} of {total} rows, so repeat "
+                        f"the call with confirm=yes AND expect={len(hits)} to delete them.")
+            return jsonify({"dry_run": True, "deleted": 0, "note": note, **report})
+        if len(hits) > BULK_DELETE_ECHO_OVER and expect != len(hits):
+            return jsonify({"error": "Confirm the count.", "dry_run": True, "deleted": 0,
+                            "details": [f"This matches {len(hits)} of {total} rows. A delete that large "
+                                        f"has to name its own size: repeat the call with expect={len(hits)}."],
+                            **report}), 409
+        removed = submissions.remove(doc_ids=[d.doc_id for d in hits]) if hits else []
+    return jsonify({"dry_run": False, "deleted": len(removed),
+                    **{**report, "rows": total - len(removed)}})
+
+
+@app.get("/api/whoami")
+def whoami():
+    """Organiser-only: what address this server actually sees for a caller.
+
+    _client_ip() takes the LAST X-Forwarded-For entry, which is the right
+    choice behind a proxy that appends the real peer. Whether the host in front
+    of this app does that has to be measured rather than assumed: if the value
+    collapsed to one proxy address, per-IP rate limiting would drop every
+    student into a single bucket and throttle the whole class at once. Call
+    this once from outside, compare the four fields, and set
+    LEADERBOARD_RATELIMIT_SCOPE accordingly. Read only, no secrets."""
+    if not admin_key_ok():
+        return jsonify(ADMIN_DENIED), 403
+    return jsonify({
+        "client_ip": _client_ip(),
+        "x_forwarded_for": request.headers.get("X-Forwarded-For"),
+        "x_real_ip": request.headers.get("X-Real-IP"),
+        "remote_addr": request.remote_addr,
+        "ratelimit": {"enabled": RATELIMIT_ON, "scope": RATELIMIT_SCOPE},
+    })
 
 
 @app.get("/api/final")
@@ -1388,6 +1602,406 @@ def admin_republish_saved():
                                   else "already" if saved else "none")
 
 
+# ----------------------------------------------------------------------------
+# Rate limiting
+# ----------------------------------------------------------------------------
+# The goal here is availability and nothing else: one person running a loop
+# must not be able to make the site slow or unreachable for everyone else.
+#
+# PER CALLER is the primary scope, and it is the only thing that refuses a
+# request because of what that caller did. The students are on their own
+# connections rather than behind one shared university NAT, so an address
+# really is one person and throttling it throttles exactly the right thing.
+# Every browser also sends its own X-Owner-Token on every API call, so a caller
+# gets an address bucket AND a token bucket and the tighter of the two bites.
+# That pairing is deliberate: a token is trivially rotated, and an address can
+# turn out to be shared by a proxy nobody measured (see GET /api/whoami), so
+# each one covers the other's blind spot.
+#
+# The GLOBAL tiers behind them are LOAD SHEDDING, not a wall:
+#   * once a request has been refused it stops counting anywhere, so one
+#     flooder can no longer drive the counter that everybody shares
+#   * over the soft budget only BUSY callers are refused. A student polling one
+#     tab, uploading once, downloading the data once, is never refused because
+#     somebody else is flooding
+#   * a hard backstop far above anything a class can produce refuses everybody,
+#     because at that point the alternative is the site falling over. Its
+#     window is minutes, not an hour, so the site heals on its own.
+# "Refuse everyone" is the worst outcome there is here, so every global number
+# sits well above a real workshop and the shed tier is what does the work.
+#
+# Buckets deliberately do NOT live in TinyDB. Every table write there takes the
+# same global db_lock() and rewrites the entire database file, so a limiter
+# stored that way would rewrite the whole leaderboard on every ten second poll:
+# the throttle would become the denial of service it exists to prevent. Instead
+# the read tiers use a per-process dict (zero I/O on the hot polling path) and
+# the rare write tiers a small JSON file the workers share.
+#
+# The limiter never refuses a student because IT had a bad day. A missing,
+# corrupt or unwritable store, or an unexpected exception, lets the request
+# through. The one thing NOT treated as "let it through" is a busy lock: under
+# a flood contention is the normal case, so those checks fall back to this
+# worker's own memory store rather than going uncounted.
+# ----------------------------------------------------------------------------
+# Emergency escape hatch: LEADERBOARD_RATELIMIT=off turns the whole thing off
+# without a redeploy (and lets tests drive the endpoints at full speed).
+RATELIMIT_ON = (os.environ.get("LEADERBOARD_RATELIMIT", "on").strip().lower()
+                not in ("off", "0", "false", "no"))
+# Which scope carries the primary limits. 'ip' is correct as long as the client
+# address really is the student's; GET /api/whoami settles that question on the
+# live host, and this seam retunes the limiter without touching code. If the
+# answer ever comes back "every student looks like the same address", set
+# LEADERBOARD_RATELIMIT_SCOPE=token: the token bucket is one per browser and
+# the address tier disappears.
+RATELIMIT_SCOPE = os.environ.get("LEADERBOARD_RATELIMIT_SCOPE", "ip").strip().lower()
+if RATELIMIT_SCOPE not in ("ip", "token", "both"):
+    RATELIMIT_SCOPE = "ip"
+RATELIMIT_TOKEN_SLACK = 2     # the courtesy token tier is looser, so it can never bite first
+RL_PATH = DB_PATH.with_name("ratelimit.json")
+RL_LOCK_PATH = RL_PATH.with_name(RL_PATH.name + ".lock")
+# Buckets are tiny and both stores are flat in the number of them, so this is
+# sized for the whole workshop with room to spare: a student holds about seven
+# write-tier buckets, so 2000 covers a cohort of ~250 without a single eviction.
+RL_MAX_BUCKETS = 2000
+RL_UPLOAD_GAP_S = 2           # minimum seconds between two accepted uploads from one caller
+RL_FILE_WAIT_S = 0.05         # how long a thread waits for this worker's turn at the file
+RL_FILE_SPINS = 20            # then this many tries at the cross-process lock,
+RL_FILE_SPIN_S = 0.002        # 2 ms apart, before falling back to the memory store
+# The backstop buckets, named rather than matched on a prefix so that anything
+# else in the store, junk included, stays evictable and the file cannot grow
+# without bound. Per-caller keys are "<tier>|i|<ip>" or "<tier>|t|<hash>" and
+# never collide with these.
+RL_GLOBAL_KEYS = frozenset(("g|read", "g|put", "g|del", "g|zip"))
+
+_rl_mem: dict[str, list] = {}          # read tiers: this worker only, never touches disk
+_rl_mem_lock = threading.Lock()
+_rl_file_turn = threading.Lock()       # one thread of this worker at the shared file at a time
+
+
+def _rl_bucket(value: object) -> list | None:
+    """A stored bucket, or None if it is anything else. The file store is on
+    disk and may hold whatever a crash or a bad actor left behind."""
+    if (isinstance(value, list) and len(value) >= 2
+            and isinstance(value[0], (int, float)) and isinstance(value[1], (int, float))):
+        return value
+    return None
+
+
+def _rl_span(bucket: list) -> float:
+    """The window a bucket was created for, 0 for one written before that field
+    existed. Only used to throw dead buckets away, so 0 just means "keep"."""
+    if len(bucket) >= 3 and isinstance(bucket[2], (int, float)) and bucket[2] > 0:
+        return float(bucket[2])
+    return 0.0
+
+
+def _rl_evict(buckets: dict, protect: frozenset = frozenset(), now: float | None = None) -> None:
+    """Keep a store bounded without ever throwing away a counter that is doing
+    work right now. Three rules, in order:
+
+      * a bucket whose window has already ended is dead weight, so it goes
+        first. Against a flood that rotates addresses this alone clears the store
+      * the caller being counted THIS request is never a victim. Dropping it
+        reset the very limit the request was being measured against, so a flood
+        that rotated tokens could clear its own address bucket and start over,
+        and a caller already over the limit could be handed a fresh one
+      * of what is left, oldest window first and, on a tie, FEWEST HITS. Under
+        a flood every live bucket shares a window start, so the hit count is
+        the only thing separating a busy caller from a one-shot address, and
+        the busy ones are the whole point of keeping counters at all.
+
+    The global buckets are never candidates either: their windows are short, so
+    under a flood they tie with every address hammering right now, and losing
+    them takes the backstop away exactly when it is needed.
+
+    A value of the wrong shape is thrown away, so a store somebody corrupted
+    repairs itself instead of pinning the sort."""
+    now = time.time() if now is None else now
+    keep = RL_GLOBAL_KEYS | protect
+    for key in [k for k in buckets if k not in keep]:
+        bucket = _rl_bucket(buckets[key])
+        span = _rl_span(bucket) if bucket is not None else 0.0
+        if bucket is None or (span and now - bucket[0] >= span):
+            buckets.pop(key, None)
+    if len(buckets) <= RL_MAX_BUCKETS:
+        return
+    victims = sorted((k for k in buckets if k not in keep),
+                     key=lambda k: (buckets[k][0], buckets[k][1]))
+    for key in victims[:len(buckets) - RL_MAX_BUCKETS]:
+        buckets.pop(key, None)
+
+
+def _rl_run(buckets: dict, checks: list[tuple], now: float, own: int) -> tuple[int, int]:
+    """One group of checks. Returns (seconds to wait, this caller's own hits).
+
+    A bucket is [window_start, hits, window] in a fixed window, so the wait is
+    simply the time left in that window. Check kinds:
+      count  a per-caller tier: this request counts against it
+      gap    minimum interval since the last ACCEPTED request, no counter
+      shed   a global tier: counts, and when it is over budget refuses only
+             callers with more than `spare` hits of their own this window
+      peek   read a counter without counting; the hard global backstop. It
+             refuses AT the limit rather than past it, because unlike a count
+             it is not the check doing the incrementing
+
+    The first tier to refuse ends the pass. Nothing counts a request that has
+    already been turned away, so a flood cannot keep pushing a counter up after
+    it has started being refused, and a backstop that has tripped stops being
+    driven higher by the flood that tripped it: it falls back at the end of its
+    own window instead of being held down for as long as the flood lasts."""
+    worst = 0
+    for check in checks:
+        if worst:
+            break
+        kind, key, limit, window = check[:4]
+        bucket = _rl_bucket(buckets.get(key))
+        if kind == "gap":
+            if bucket is not None and 0 <= now - bucket[0] < window:
+                worst = max(worst, int(window - (now - bucket[0])) + 1)
+            continue
+        start = now - (now % window)
+        if bucket is not None and bucket[0] != start:
+            bucket = None                       # last window's counter, not this one's
+        if kind == "peek":
+            if bucket is not None and bucket[1] >= limit:
+                worst = max(worst, int(start + window - now) + 1)
+            continue
+        bucket = [start, 0, window] if bucket is None else [bucket[0], bucket[1], window]
+        bucket[1] += 1
+        buckets[key] = bucket
+        if kind == "count":
+            own = max(own, int(bucket[1]))
+            if bucket[1] > limit:
+                worst = max(worst, int(start + window - now) + 1)
+        elif kind == "shed" and bucket[1] > limit and own > (check[4] if len(check) > 4 else 0):
+            worst = max(worst, int(start + window - now) + 1)
+    return worst, own
+
+
+def _rl_apply(buckets: dict, checks: list[tuple], now: float) -> int:
+    """Run one request's checks against a bucket store; return the seconds to
+    wait if any tier refuses it, else 0.
+
+    The per-caller checks run FIRST and short-circuit. A request that has
+    already been refused must not go on driving the counters everybody shares:
+    counting it there is how one address flooding turned into every student on
+    the site being told to wait."""
+    mine = [c for c in checks if c[1] not in RL_GLOBAL_KEYS]
+    shared = [c for c in checks if c[1] in RL_GLOBAL_KEYS]
+    worst, own = _rl_run(buckets, mine, now, 0)
+    if not worst:
+        worst = _rl_run(buckets, shared, now, own)[0]
+    if not worst:
+        # The interval runs from the last request we actually let through, so a
+        # student who double clicks is not pushed further away by their own retries.
+        for check in mine:
+            if check[0] == "gap":
+                buckets[check[1]] = [now, 1, check[3]]
+    if len(buckets) > RL_MAX_BUCKETS:
+        _rl_evict(buckets, frozenset(c[1] for c in checks), now)
+    return worst
+
+
+def _rl_mem_hit(checks: list[tuple]) -> int:
+    """The read tiers. The board polls these every ten seconds from every open
+    tab, so this path must not touch the filesystem even once. Each worker
+    counts on its own, which makes the global read tier per worker in
+    production; that is the price of keeping the poll free, and the per-caller
+    tiers are the ones doing the real work anyway."""
+    with _rl_mem_lock:
+        return _rl_apply(_rl_mem, checks, time.time())
+
+
+def _rl_file_pass(checks: list[tuple]) -> int | None:
+    """One pass over the shared bucket file, or None if it could not be taken:
+    another worker holds it, there is no filesystem locking, or the store is
+    unwritable. None means "no answer", never "allowed"."""
+    try:
+        import fcntl
+    except ImportError:
+        return None
+    lock_fh = None
+    try:
+        RL_PATH.parent.mkdir(parents=True, exist_ok=True)
+        lock_fh = open(RL_LOCK_PATH, "a+")
+        for attempt in range(RL_FILE_SPINS):
+            try:
+                fcntl.flock(lock_fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except OSError:
+                if attempt == RL_FILE_SPINS - 1:
+                    return None
+                time.sleep(RL_FILE_SPIN_S)
+        try:
+            try:
+                buckets = json.loads(RL_PATH.read_text(encoding="utf-8"))
+                if not isinstance(buckets, dict):
+                    raise ValueError("not an object")
+            except (OSError, ValueError):
+                buckets = {}   # missing or corrupt: start a fresh store, never refuse
+            worst = _rl_apply(buckets, checks, time.time())
+            with open(RL_PATH, "w", encoding="utf-8") as fh:
+                json.dump(buckets, fh)
+            return worst
+        finally:
+            fcntl.flock(lock_fh, fcntl.LOCK_UN)
+    except Exception:
+        return None
+    finally:
+        if lock_fh is not None:
+            with contextlib.suppress(OSError):
+                lock_fh.close()
+
+
+def _rl_file_hit(checks: list[tuple]) -> int:
+    """The write tiers: uploads, deletes and the zip. One small JSON file that
+    every worker shares.
+
+    A busy lock must never mean "allow and forget". With more than one
+    connection in flight contention is the NORMAL case, and a flood is exactly
+    the shape that causes it: treating it as a pass measured 346 requests
+    through a budget of 15. So threads inside this worker take a short turn at
+    the file one at a time, the cross-process lock is retried for a bounded
+    spin, and if the file is still out of reach the same checks are counted in
+    this worker's memory store instead. That is a weaker limit, one worker's
+    share of the traffic, but it is a limit, and it costs a student nothing.
+
+    Never fsynced, and a half-written file is discarded on the next read,
+    because losing buckets is harmless and refusing students is not."""
+    if _rl_file_turn.acquire(timeout=RL_FILE_WAIT_S):
+        try:
+            worst = _rl_file_pass(checks)
+        finally:
+            _rl_file_turn.release()
+        if worst is not None:
+            return worst
+    return _rl_mem_hit(checks)
+
+
+def _rl_tiers(key: str, tiers: list[tuple[int, int]], slack: int, gap_s: int) -> list[tuple]:
+    checks = [("count", f"{key}|{window}", limit * slack, window) for limit, window in tiers]
+    if gap_s:
+        checks.append(("gap", f"{key}|gap", 0, gap_s))
+    return checks
+
+
+def _rl_caller(prefix: str, tiers: list[tuple[int, int]], gap_s: int = 0,
+               ip_tiers: list[tuple[int, int]] | None = None) -> list[tuple]:
+    """The per-caller checks for this request under the configured scope.
+
+    `ip_tiers` lets the address bucket be looser than the token bucket. The
+    board poll uses it: a browser always sends its token, so the token tier is
+    the one that fits a student and the address tier is there to stop a
+    tokenless or token-rotating loop. Keeping that one loose is also the
+    insurance against _client_ip() turning out to be a proxy the whole class
+    shares, because a wrong guess there must not throttle everybody at once."""
+    checks: list[tuple] = []
+    if RATELIMIT_SCOPE in ("ip", "both"):
+        checks += _rl_tiers(f"{prefix}|i|{_client_ip()}", ip_tiers or tiers, 1, gap_s)
+    token = request.headers.get("X-Owner-Token", "").strip()
+    if token and is_valid_token(token):
+        # Hashed, so the store on disk never holds a student's actual token.
+        # Callers without a token are skipped entirely rather than sharing one
+        # bucket, which would let a handful of them throttle all the rest.
+        primary = RATELIMIT_SCOPE in ("token", "both")
+        checks += _rl_tiers(f"{prefix}|t|{hash_token(token)[:16]}", tiers,
+                            1 if primary else RATELIMIT_TOKEN_SLACK, gap_s if primary else 0)
+    return checks
+
+
+RL_READ_PATHS = ("/api/submissions", "/api/submissions/mine", "/api/final")
+
+
+def _rl_plan() -> tuple[str, list[tuple]] | None:
+    """(store, checks) for this request, or None when nothing is limited.
+
+    The pages, /static, /examples and the markdown routes are free: the host's
+    web server answers most of them and the rest are a file read. Limits go
+    only where a request costs the Python worker real work."""
+    path = request.path
+    # Flask registers HEAD alongside every GET route and runs the whole view,
+    # throwing away only the body, so a HEAD costs exactly what its GET costs.
+    # Meter the two as one thing or `curl -I` in a loop is an unmetered way to
+    # hold the database lock, which is the attack this section exists to stop.
+    method = "GET" if request.method == "HEAD" else request.method
+    if path.startswith("/admin"):
+        return None            # the organiser must never be able to lock themselves out
+    if path == "/data/benchmarks.zip" and method == "GET":
+        # 641 KB out of the worker's own memory on every hit: cheap to serve,
+        # so the limits only have to stop a loop. The whole class clicking the
+        # link at kickoff, twice each, has to sail through, and a global window
+        # of ten minutes means even a mistake here heals inside ten minutes
+        # rather than holding the workshop data shut for the hour.
+        return "file", _rl_caller("zip", [(40, 3600)]) + [("peek", "g|zip", 900, 600),
+                                                          ("shed", "g|zip", 400, 600, 5)]
+    if not path.startswith("/api/"):
+        return None
+    if method == "GET" and path in RL_READ_PATHS:
+        # One open tab polls the board six times a minute and /api/final with
+        # it, so 120 per token is about ten tabs, and the address tier above it
+        # is deliberately loose.
+        return "mem", _rl_caller("read", [(120, 60)], 0, [(600, 60)]) + [
+            ("peek", "g|read", 7200, 60), ("shed", "g|read", 2400, 60, 120)]
+    if method == "PUT" and path == "/api/submissions/mine":
+        # No global new-rows tier lives here on purpose. It refused every
+        # student on the site, replacements included, once a hundred first
+        # uploads landed inside ten minutes, and a 600 s Retry-After in the
+        # last ten minutes before the deadline is a student who never submits.
+        # MAX_SUBMISSIONS is the runaway guard for row creation.
+        return "file", (_rl_caller("put", [(30, 600), (90, 3600)], RL_UPLOAD_GAP_S)
+                        + [("peek", "g|put", 1500, 300), ("shed", "g|put", 600, 300, 8)])
+    if method == "DELETE" and (path == "/api/submissions/mine"
+                               or path.startswith("/api/submissions/mine/")):
+        return "file", _rl_caller("del", [(20, 600)]) + [("peek", "g|del", 400, 300),
+                                                         ("shed", "g|del", 150, 300, 6)]
+    if method == "DELETE" and path.startswith("/api/submissions/"):
+        if admin_key_ok():
+            return None        # the organiser's own cleanup tool, never throttled
+        return "file", [("count", f"admdel|i|{_client_ip()}", 10, 900)]
+    return None
+
+
+def _rl_too_many(wait: int):
+    """429 in the shape the caller already understands. Built by hand rather
+    than through abort(), which would drop both the details array the front end
+    reads and the Retry-After header."""
+    wait = max(1, min(int(wait), 3600))
+    message = (f"You are sending requests too quickly. Wait {wait} "
+               f"{'second' if wait == 1 else 'seconds'} and try again.")
+    if request.path.startswith("/api/"):
+        response = jsonify({"error": "Too many requests.", "details": [message]})
+    else:
+        response = app.response_class(message + "\n", mimetype="text/plain")
+    response.status_code = 429
+    response.headers["Retry-After"] = str(wait)
+    return response
+
+
+@app.before_request
+def rate_limit():
+    """Refuse a flood before it costs anything.
+
+    This runs ahead of routing on purpose: a rejected request spends a few
+    milliseconds on bucket bookkeeping instead of reading a body, parsing it,
+    scoring it against the answer keys and taking a turn on the database lock
+    that every board read is also waiting for.
+
+    Any exception at all lets the request through. See the note above: the
+    limiter failing must never be worse for a student than no limiter."""
+    if not RATELIMIT_ON:
+        return None
+    try:
+        plan = _rl_plan()
+        if plan is None:
+            return None
+        store, checks = plan
+        wait = _rl_mem_hit(checks) if store == "mem" else _rl_file_hit(checks)
+        return _rl_too_many(wait) if wait > 0 else None
+    except Exception:
+        app.logger.exception("rate limiter failed open on %s", request.path)
+        return None
+
+
 OWNER_COOKIE = "ostrai_owner"
 OWNER_COOKIE_MAX_AGE = 60 * 24 * 3600      # 60 days, refreshed on every visit
 
@@ -1416,6 +2030,14 @@ def _refresh_owner_cookie(response) -> None:
 
 @app.after_request
 def cache_headers(response):
+    # Cheap and universal. nosniff stops a browser from deciding an uploaded or
+    # echoed string is really HTML; DENY keeps the board out of a frame, where a
+    # transparent overlay could otherwise talk a student into clicking their own
+    # delete button. Deliberately NOT a Content-Security-Policy: the pages pull
+    # Google Fonts, a wrong policy would visibly break the site for everyone,
+    # and it would do nothing for keeping the site up.
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
     if request.path.startswith("/admin"):
         # never cache the editor or its session state, anywhere
         response.headers["Cache-Control"] = "no-store, private"
