@@ -1,11 +1,1501 @@
 id	text	intent
+10	set a reminder for me to request time off	reminder_update
+37	when is my kaiser bill due	bill_due
+39	no, that is not right at all	no
+80	how old are you in 2019	how_old_are_you
+104	what is my tire pressure	tire_pressure
+106	how can i find my current location	current_location
+132	i'm traveling to london soon and want to inform my bank	travel_notification
+142	i didn't understand what you just said, can you repeat it	repeat
+154	what is the minimum payment for my credit card bill	min_payment
+165	when referring to you, what name should i use	what_is_your_name
+189	how much pto do i have left	pto_balance
+192	put bread on my shopping list	shopping_list_update
+207	what is the due date of my bill	bill_due
+217	i'd like to change my pin number for my savings account	pin_change
+250	what is the mpg on this car	mpg
+264	i want to report my card as lost	report_lost_card
+265	can you change your language to japanese	change_language
+283	i got to change my pin number for my account	pin_change
+299	i want to pay my water bill	pay_bill
+318	how many pto days do i have remaining	pto_balance
+323	cancel my reservation for 5 at the loft	cancel_reservation
+325	how much pto have i used so far	pto_used
+330	i want to change your name to adam	change_ai_name
+331	what are the reviews like for zazie	restaurant_reviews
+336	are you considered a bot	are_you_a_bot
+347	cancel my dinner reservation please	cancel_reservation
+377	how do i report my lost card	report_lost_card
+386	what is my current interest rate	interest_rate
+393	give me my current location	current_location
+396	what is the traffic like on the way to kapolei	traffic
+407	increase the volume level to 4, please	change_volume
+413	my insurance gives me what benefits	insurance
+417	what time is it in the pacific standard time	time
+421	i need to know directions to the nearest gas station	directions
+431	i need a report form for my damaged, demagnetized card	damaged_card
+434	how long do i cook the chicken roast	cook_time
+475	how do i get to the beach by bus	directions
+479	how many inches are in 5 feet	measurement_conversion
+487	add this song to my dinner playlist	update_playlist
+493	i need to schedule car maintenance	schedule_maintenance
+500	help me find a good reviews hotel in la	book_hotel
+509	i gotta make a reservation for 8 pm at red robin for 3	restaurant_reservation
+512	tell me a joke about animals	tell_joke
+540	how is the traffic like on the way to the beach	traffic
+541	i need to set up a direct deposit	direct_deposit
+552	what is the meaning of life here	meaning_of_life
+559	i need a list of ingredients required to make lamb stew	ingredients_list
+571	should i cook this for a long time	cook_time
 602	cancel my reservation for dinner	cancel_reservation
+614	can you play some music by the beatles for me	play_music
+626	my card is damaged so i can not use it	damaged_card
+627	how can i set up direct deposit	direct_deposit
+639	i want to hear everything on my todo list	todo_list
+649	i'm traveling to paris soon and want to inform my bank	travel_notification
+658	put appointment on my calendar for tomorrow	calendar_update
+661	what kinds of things can i ask you	what_can_i_ask_you
+736	switch to the whisper mode	whisper_mode
+737	check on the status of my order	order_status
+741	does boston restaurant have favorable reviews	restaurant_reviews
+749	what kinds of questions can i ask of you	what_can_i_ask_you
+751	how much pto have i used	pto_used
+768	my card is damaged and unusable	damaged_card
+775	when was my last payday	payday
+792	share my location with sarah	share_location
+794	how much gas do i have left	gas
+797	book a hotel in pa, harrisburg for the 10th to 15th	book_hotel
+812	how do i report fraud on my chase bank card	report_fraud
+820	what is the name you call me	user_name
+822	i want to know who made you	who_made_you
+825	i want to make a call to uncle	make_call
+831	transfer $500 from my checking to my savings	transfer
+833	what sort of pets do you have	do_you_have_pets
+835	what's the mpg of this car	mpg
 837	set a timer for 5 minutes	timer
+849	can you please flip a coin, i call tails	flip_coin
+860	please delete my todo list	todo_list_update
+876	what ingredients do i need to make pizza	ingredients_list
+940	what is the status of my new credit card application	application_status
+952	how do i find my credit score	credit_score
+971	i need to know how to jump start my car	jump_start
+973	i have to say goodbye	goodbye
+980	what is the conversion between tablespoons and cups	measurement_conversion
+996	when is my xfinity bill due	bill_due
+1000	where did your mom have you	where_are_you_from
+1020	please flip a coin i select tails	flip_coin
+1050	what's the nutritional info for a banana	nutrition_info
+1057	what vaccines do i need before i travel there	vaccines
+1065	how do i redeem my card points	redeem_rewards
+1074	where is your favorite restaurant to eat	restaurant_suggestion
+1078	my account is blocked, help me figure out why	account_blocked
+1079	can you give me a meal suggestion for swedish cuisine	meal_suggestion
+1085	how can i change information on my insurance policy	insurance_change
+1087	what is the real meaning of life	meaning_of_life
+1095	i would like to change my credit limit	credit_limit_change
+1113	what is the name i should use to refer to you	what_is_your_name
+1114	i'd like to improve my credit score	improve_credit_score
+1128	what do i have on my calendar for monday the 1st of march	calendar
 1129	what is the apr on my visa card	apr
+1136	could you let me know who made you	who_made_you
+1138	change your language setting to german	change_language
+1158	change your language to spanish please	change_language
+1162	how do i improve my credit score	improve_credit_score
+1170	can you change your accent to the male british one	change_accent
+1199	please give me directions to the nearest starbucks	directions
+1200	i think you are a bot	are_you_a_bot
+1221	what is the meeting schedule today	meeting_schedule
+1230	i need to change my insurance policy, how	insurance_change
+1243	tell me what the date is today	date
+1247	can you schedule a meeting with john for 12	schedule_meeting
+1256	can you confirm my reservation for donnobys at 5:00	confirm_reservation
+1261	will i need vaccines for my trip	vaccines
+1286	i need a reminder to remind me to do something	reminder_update
+1287	what's is the current weather forecast	weather
+1292	for my westport account, what is the routing number	routing
+1309	can i see my transactions on the 7th	transactions
+1342	how can you schedule a meeting for me	schedule_meeting
+1355	have i been spending a lot on alcohol lately	spending_history
+1364	where should i go to get a w2 to do my taxes	w2
+1407	how do i schedule car maintenance	schedule_maintenance
+1414	add a doctor's appointment to my calendar for friday	calendar_update
+1425	when will i get my replacement card	replacement_card_duration
+1428	what name should i use when i call you	what_is_your_name
+1431	how long will chicken last in the freezer	food_last
+1457	are you a bot or a real person	are_you_a_bot
+1462	what do i have on my calendar for march 11	calendar
+1469	can you tell me what i can ask the ai	what_can_i_ask_you
+1482	please help me book a rental car in appleton	car_rental
+1508	what is the best type of gas for this car	gas_type
+1518	remove laundry from my todo list	todo_list_update
+1526	how do i put in a pto request for the first to the ninth	pto_request
+1533	how long does pizza take to cook	cook_time
+1559	list the ingredients in pizza	ingredients_list
+1567	what restrictions are there for carry-on on delta	carry_on
+1621	blank out my todo list	todo_list_update
+1664	inform me if there's a travel alert for the country	travel_alert
+1670	i need an uber to the movies	uber
+1678	what is the definition of valor	definition
+1689	share my location with mom, please	share_location
+1698	in paris, what's the timezone	timezone
+1708	schedule a meeting for me	schedule_meeting
+1709	does burger king accept reservations	accept_reservations
+1741	please increase the volume to 4 please	change_volume
+1748	my card got damaged and i need to report it, please	damaged_card
+1760	go over my meeting schedule with me please	meeting_schedule
+1766	when do i need to change my oil	oil_change_when
+1768	i lost my discover card, i want to report it	report_lost_card
+1794	find me a flight from tijuana to guadalajara on volaris	book_flight
+1798	what is now on my reminder list	reminder
+1804	can you find me a recipe for carrot cake	recipe
+1818	where were you manufactured	where_are_you_from
+1826	change mode to whisper	whisper_mode
+1843	i need you to order all the things on my shopping list	order
+1849	i wanna schedule some car maintenance	schedule_maintenance
+1855	so how long can pizza last in the fridge	food_last
+1860	how old are you today	how_old_are_you
+1862	book me a car rental in nashville	car_rental
+1873	i'd like to change my pin number for my checking account	pin_change
+1880	what type of gas am i allowed to put in this car	gas_type
+1883	give me the status of my vacation request	pto_request_status
+1910	i need help booking a car rental in seattle	car_rental
+1922	how about you tell me a joke	tell_joke
+1942	can you roll a 4 sided dice	roll_dice
+1943	please transfer $100 from my checking to my savings account	transfer
+1946	can you please freeze my bank account	freeze_account
+1959	what is the apr for my credit card	apr
+1960	how do i set up direct deposit for my paycheck	direct_deposit
+1962	flip a coin, i choose heads	flip_coin
+1990	show me my transactions within the past week	transactions
+2008	please help me find my lost phone	find_phone
+2031	what methods can i use to improve my credit score	improve_credit_score
+2038	does chillis take reservations	accept_reservations
+2050	can you find me a recipe for pasta	recipe
+2063	i need to get an uber for three people to go to the zoo	uber
+2064	status of my request for vacation	pto_request_status
+2066	tell me the status of my vacation request	pto_request_status
+2080	what's my car's tire pressure	tire_pressure
+2089	in what status is my credit card application	application_status
+2108	can you change the limit on my credit please	credit_limit_change
+2133	i wish to request a change in insurance plans	insurance_change
+2140	what's the routing number for my savings account	routing
+2149	that could maybe be it	maybe
+2154	i'm traveling to morocco soon and want to inform my bank	travel_notification
+2179	what's the interest rate for my checking account	interest_rate
+2189	i need an italian meal suggestion	meal_suggestion
+2198	what is the date tomorrow, please	date
+2208	help me schedule maintenance for my car	schedule_maintenance
+2225	could you tell me the status of my vacation request	pto_request_status
+2232	what's my insurance benefits like	insurance
+2268	i want to to schedule maintenance on my vehicle	schedule_maintenance
+2295	what name do you call me	user_name
+2319	what type of gas do i need to put in this car	gas_type
+2321	what time is it in london	time
+2324	what's the timezone for boston	timezone
+2329	what is the the exchange rate for us dollars to euros	exchange_rate
+2339	i didn't hear what you just said, can you repeat it	repeat
+2346	so where do i get the w2 form	w2
+2354	add this song to my slow jams playlist	update_playlist
+2363	how can i make a change to my credit limit	credit_limit_change
+2366	can i use sour cream instead of milk	ingredient_substitution
+2367	can you make a reservation for me at the restaurant	restaurant_reservation
+2372	goodbye, helpful ai device!	goodbye
+2373	does redrobin take reservations	accept_reservations
+2417	what is my total annual income	income
+2425	can you tell me who made ai	who_made_you
+2436	when should i change my oil	oil_change_when
+2460	what do i do to change my credit limit	credit_limit_change
+2465	add soda on my shopping list and remove carrots	shopping_list_update
+2468	please connect the device to my phone	sync_device
+2478	thank you very much for the answer	thank_you
+2488	what kind of pto have i used	pto_used
+2489	i wanna know why my card was declined	card_declined
+2495	what are the carry-on restrictions for delta	carry_on
+2520	what is the status of my recent order	order_status
+2528	what is my savings account balance	balance
+2534	can you cancel my todo list please	todo_list_update
+2536	does my mastercard charge international transaction fees	international_fees
+2539	can i use pepper instead of salt	ingredient_substitution
+2570	yes, that is correct	yes
+2578	share the nutrition info for cake with me	nutrition_info
+2594	do you know what the interest rate is on my account	interest_rate
+2602	when will my replacement card get mailed	replacement_card_duration
+2609	i want to schedule car maintenance	schedule_maintenance
+2624	are my vaccines up to date for going there	vaccines
+2660	jump to the next song on this playlist	next_song
+2663	please remove the phone's sync	sync_device
+2728	i want you to recommend a good local restaurant to me	restaurant_suggestion
+2757	i need to report fraudulent activity on my card	report_fraud
+2762	what is the square root of 10500	calculator
+2786	what is the weather outside	weather
+2788	send a text message to alice	text
+2801	how busy is michel at 9	how_busy
+2808	what is the interest rate on my scotiabank account	interest_rate
+2817	can you play music by led zeppelin	play_music
+2850	where were you given birth	where_are_you_from
+2854	flip a coin; i say tails	flip_coin
+2858	am i able to apply for a new credit card	new_card
+2862	please set me an alarm	alarm
+2865	how many pets do you have	do_you_have_pets
+2880	i last took my car to the shop, when	last_maintenance
+2881	what kinds of questions can i ask you	what_can_i_ask_you
+2882	what's the balance of my bank accounts	balance
+2897	what is the time in london	time
+2899	have i have been spending a lot of money on shoes	spending_history
+2903	can you give me a vietnamese meal suggestion	meal_suggestion
+2910	i'd like to report my card as damaged, it's bent	damaged_card
+2920	i wish to know why my card was declined yesterday	card_declined
+2923	can you make a reservation at the restaurant for tomorrow	restaurant_reservation
+2947	can you speed up your speech please	change_speed
+2968	show me the last month of transactions	transactions
+2972	how do i switch to a new insurance plan	insurance_change
+2975	add oranges to my to do shopping list	shopping_list_update
+2976	please set an alarm for me	alarm
+2985	tell me the meeting schedule for the day	meeting_schedule
+2989	if i go to uganda, do i need an international visa	international_visa
+3016	what do you think is the meaning of life	meaning_of_life
+3021	what's the current tire pressure of my tires	tire_pressure
+3039	so what pets do you have	do_you_have_pets
+3066	what transactions did i put on my visa last month	transactions
+3096	maybe is what i am going to answer	maybe
+3106	what is the month of my card's expiration date	expiration_date
+3112	tell me the status of my credit card application	application_status
+3119	tell me a fun fact about computer	fun_fact
+3147	i want to change my pin number for my account	pin_change
+3152	what name do you have saved for me	user_name
+3153	what time is it in tokyo	time
+3156	are you actually a bot	are_you_a_bot
+3166	is my credit card expiration date approaching	expiration_date
+3167	get me a flight from ft lauderale to houston on southwest	book_flight
+3169	i need you to set an alarm for 8am tomorrow	alarm
+3171	what day is my next payday	payday
+3179	do they accept reservations at michael's	accept_reservations
+3181	i need to schedule some car maintenance	schedule_maintenance
+3193	i really need to change my pin number for my account	pin_change
+3195	i lost my commerce card and need to report it as lost	report_lost_card
+3227	do i need an international visa to go to canada	international_visa
+3232	what is the square root of 5	calculator
+3249	i want you to reset your factory settings	reset_settings
+3260	no, that is not correct	no
+3275	i want to pay my gas bill	pay_bill
+3280	help me set a reminder to work out	reminder_update
+3287	share the nutrition info for spaghetti with me	nutrition_info
+3288	what is my american express card's rewards balance	rewards_balance
+3295	what's the meaning of my life	meaning_of_life
+3302	i need to know how much gas i have	gas
+3303	please cancel the input	cancel
+3312	can you you confirm my reservation for jean at taco house	confirm_reservation
+3334	turn the furnace on please	smart_home
+3352	send mom a text i'll talk to you later	text
+3358	where can i get a w2	w2
+3360	when will a replacement card get here	replacement_card_duration
+3362	change my name to master	change_user_name
+3374	i'd love to order some more checks for my checking account	order_checks
+3408	can i get an uber for 4 to the mall	uber
+3428	what is the definition of flange	definition
+3438	share the nutrition info for brownies with me	nutrition_info
+3444	please switch to whisper mode	whisper_mode
+3445	my card got damaged and i need to report it	damaged_card
+3455	the programmer who made you is who	who_made_you
+3467	can i substitute milk for water	ingredient_substitution
+3497	i got to schedule some car maintenance	schedule_maintenance
+3522	can you confirm my reservation for applebees at 2:00	confirm_reservation
+3526	what is the exchange rate for canadian dollars to us dollars	exchange_rate
+3558	please set alarm for me	alarm
+3568	turn the volume to 4	change_volume
+3584	i need the exchange rate between pounds and us dollars	exchange_rate
+3585	yes, i'd really like that alot	yes
+3592	please change the ai name for me	change_ai_name
+3601	read me my meeting schedule	meeting_schedule
+3622	i must change my pin number for my account	pin_change
+3634	what is the definition of altruism	definition
+3636	can i use milk instead of cream	ingredient_substitution
+3652	please set a timer for me	timer
+3692	share the nutrition info for pizza with me	nutrition_info
+3710	who do you call your boss	who_do_you_work_for
+3714	play music by the beatles	play_music
+3718	what are the carry on limits for delta	carry_on
+3721	tell me a funny joke	tell_joke
+3726	when is the bill due	bill_due
+3728	what type of gas does my car use	gas_type
+3731	has the status of my vacation request changed	pto_request_status
+3759	how many days old are you	how_old_are_you
+3775	can you make a phone call to roger	make_call
+3788	check on the status of my vacation request please	pto_request_status
+3798	when should i change my car oil	oil_change_when
+3817	what is the weather in tokyo	weather
+3834	either of them could be i'm not sure	maybe
+3854	cancel that last command	cancel
+3870	i have to go ai goodbye	goodbye
+3938	tell me the status of flight dl123	flight_status
+3960	what do i do if i lost my luggage	lost_luggage
+3969	can i see all the international transaction fees on my amex	international_fees
+4011	find me a flight from philly to atl for june 5th to 8th	book_flight
+4014	give me directions to the nearest gas station	directions
+4018	the status of my day off request, please	pto_request_status
+4033	can you find me a recipe for cake	recipe
+4061	please confirm my reservation for 2/20 at 8 pm	confirm_reservation
+4063	i don't know the reason my account is blocked	account_blocked
+4080	can you let me know how many pto days do i have left	pto_balance
+4111	can you play the song that goes doo doo doo	play_music
+4117	how will i find my current location	current_location
+4121	when was the last time my car was in the shop	last_maintenance
+4123	i think it could be either one	maybe
+4187	my insurance benefits are what	insurance
+4193	what do you say for my name	user_name
+4209	change language setting to english	change_language
+4215	change to whisper mode, please	whisper_mode
+4222	report to the company that i damaged my card	damaged_card
+4268	i want to report fraudulent activity on my card	report_fraud
+4276	can you tell me a joke about politicians	tell_joke
+4335	share my gps location with steve	share_location
+4384	how many calories are in oranges	calories
+4386	does my usaa card have international transaction fees	international_fees
+4396	what's the credit limit on my visa card	credit_limit
+4421	tell me what is on my shopping list	shopping_list
+4426	tell me a fun fact about mt everest	fun_fact
+4430	ai how are you doing today	greeting
+4431	how do i change my insurance policy	insurance_change
+4465	when is the next office holiday	next_holiday
+4471	what do i need to set up direct deposit	direct_deposit
+4475	when is the next scheduled holiday	next_holiday
+4487	i would like to apply for a new card	new_card
+4492	can you find me a recipe for pie	recipe
+4511	i need you to switch to whisper mode	whisper_mode
+4512	what is the minimum payment for my power bill	min_payment
+4514	is there a travel alert in argentina	travel_alert
+4519	can you help me find my phone	find_phone
+4534	what steps can i take to improve my credit score	improve_credit_score
+4552	could you speed up your speech	change_speed
+4555	how much total gas do i have	gas
+4559	how many different pets do you have	do_you_have_pets
+4567	what's the carry on policy for delta	carry_on
+4578	what's the status of my order	order_status
+4583	whats the status of my delta flight	flight_status
+4628	what do i have on my calendar for march 2	calendar
+4634	what name should i use for you	what_is_your_name
+4636	please repeat what you just said	repeat
+4644	what is the definition of zesty	definition
+4645	i wanna order some more checks for my checking account	order_checks
+4659	tell me the routing number for my wf account	routing
+4708	please confirm my reservation for kevin at red robin	confirm_reservation
+4719	flip a coin, i call tails	flip_coin
+4733	i need an uber to the sears tower	uber
+4765	do i have any pto days left	pto_balance
+4787	tell me what the weather is like	weather
+4813	have i been spending a lot on food lately	spending_history
+4818	how long can i put pizza in the fridge	food_last
+4820	can you translate bat into russian for me	translate
+4823	what do i have on my shopping list	shopping_list
+4824	when is the next holiday, please	next_holiday
+4828	do i need an international visa to go to mexico	international_visa
+4837	i want you reset to factory settings	reset_settings
+4843	would you tell me who made the ai	who_made_you
+4847	please turn on the hallway lights	smart_home
+4859	when is the expiration date for my discover card	expiration_date
+4861	what steps do i take to redeem my credit card points	redeem_rewards
+4880	what items do i have on my calendar for easter	calendar
+4884	why was my card declined yesterday	card_declined
+4909	how long does it take to get to the park in detroit	distance
+4918	could you tell me the status of my frontier flight	flight_status
+4922	please add this song to my jazz playlist	update_playlist
+4936	what's this song playing	what_song
+4958	when will you send me a replacement card	replacement_card_duration
+4959	please increase the volume to 4	change_volume
+4971	can you cancel what you were doing	cancel
+4992	name a good restaurant near me	restaurant_suggestion
+5008	what's the tire pressure of my car	tire_pressure
+5028	can you tell me the status of my delta flight	flight_status
+5030	share my meeting schedule with me	meeting_schedule
+5031	flip a coin, i have tails	flip_coin
+5070	please freeze my bank account	freeze_account
+5078	what ingredients do i need to make spaghetti	ingredients_list
+5079	the name you have for me is what	user_name
+5092	change the speed of your voice to slower	change_speed
+5094	can you turn on the tv	smart_home
+5097	give me a list of ingredients needed for pizza dough	ingredients_list
+5100	what is the traffic like on the way to town	traffic
+5106	how long can i have pizza in the fridge	food_last
+5108	report fraud on my card	report_fraud
+5109	what is the definition of incomprehensible	definition
+5155	how do i do a jump start on my car	jump_start
+5163	tell me why my card was declined yesterday	card_declined
+5164	how many pto days do i have left	pto_balance
+5167	what are the international transaction fees on my amex	international_fees
+5171	play some music for me	play_music
+5172	set a reminder for me	reminder_update
+5178	are you a bot or a person	are_you_a_bot
+5181	what's the minimum payment on my phone bill	min_payment
+5187	what other hobbies do you enjoy	what_are_your_hobbies
+5192	i need to know how to change my oil	oil_change_how
+5204	when do i change my oil	oil_change_when
+5210	i need to set up a direct deposit for my paycheck	direct_deposit
+5227	add this song to my top 40 playlist	update_playlist
+5235	tell me my current location	current_location
+5242	in the central timezone, what time is it	time
+5259	do i have anything on my calendar for march 2nd	calendar
+5261	i need you to repeat that, please	repeat
+5265	what should i do if i lost my luggage	lost_luggage
+5267	what's the routing number for my chase account	routing
+5290	have i been spending a lot on shoes lately	spending_history
+5293	i need help to set up direct deposit	direct_deposit
+5299	when is my water bill due	bill_due
+5307	let my bank know i will be on travel to fes	travel_notification
 5316	what is the traffic like on the way to work	traffic
+5325	how do i change the name you use to address me	change_user_name
+5335	put a freeze on my bank account	freeze_account
+5345	so why was my card declined yesterday	card_declined
+5353	please add this song to my alternative playlist	update_playlist
+5361	can you tell me a joke	tell_joke
+5363	what is the definition of intelligent	definition
+5382	can you translate bowl into russian for me	translate
+5400	have i been spending excessively on donuts recently	spending_history
+5409	i need to know favorable reviews about boston restaurant	restaurant_reviews
+5413	what do you have in the way of pets	do_you_have_pets
+5437	maybe one, maybe the other	maybe
+5440	can i redeem my credit card points for anything	redeem_rewards
+5458	send a text to mom i'll talk to you later	text
+5459	can you slow down the speed in which you speak	change_speed
+5484	how much gas do i have	gas
+5485	set a reminder to pay my taxes	reminder_update
+5496	please cancel my reservation for dinner	cancel_reservation
+5499	is there a travel alert for that country	travel_alert
+5512	is there a travel alert for russia	travel_alert
+5552	what is the definition of didactic	definition
+5583	i lost my phone, can you help me find it	find_phone
+5608	i need to remove fishing from my calendar for soccer	calendar_update
+5617	when is my electric bill due	bill_due
+5630	set a reminder to check the steak	reminder_update
+5632	i want to learn how to change the oil in my car	oil_change_how
+5661	how can i redeem rewards earned through my amex card	redeem_rewards
+5683	what's a fun fact about elephants	fun_fact
+5690	it was nice to speak with you	goodbye
+5702	i want to pay my bill, please	pay_bill
+5711	what are your best travel suggestions	travel_suggestion
+5723	what is the balance of my bank of american account	balance
+5724	add farm trip to my calendar for friday	calendar_update
+5733	have i been spending a lot on take out lately	spending_history
+5740	please change your response language to english	change_language
+5746	how long does it take to cook roast beef	cook_time
+5773	how long will it take the bus to get to stop 23	distance
+5797	what is the definition of the word migrate	definition
+5798	what is the highway mpg on this car	mpg
+5833	why was my card declined	card_declined
+5841	can you tell me where you were created	where_are_you_from
+5848	delete everything on my todo list	todo_list_update
+5864	are the reviews for chevy's any good	restaurant_reviews
+5875	what do i have on my todo list	todo_list
+5881	change the ai name to a new one	change_ai_name
+5893	could you book me a hotel in tampa from may 2 to may 4	book_hotel
+5909	what all can i ask you	what_can_i_ask_you
+5911	can i use water instead of milk	ingredient_substitution
+5920	tell me how to improve my credit score	improve_credit_score
+5932	i no longer want this phone to sync	sync_device
+5934	what is the correct spelling for malignant	spelling
+5966	please repeat what you said	repeat
+5974	would you change your accent to the male british one	change_accent
+5983	the next holiday is when	next_holiday
+5987	can i substitute salt for pepper	ingredient_substitution
+6002	tell me if boston restaurant has good reviews	restaurant_reviews
+6007	where do i redeem my credit card points	redeem_rewards
+6024	is there a way i can change the name you use to address me	change_user_name
+6028	can you change the volume to 4	change_volume
+6034	for what reason is my account blocked	account_blocked
+6055	am i able to rollover my 401k	rollover_401k
+6071	add song to my hype playlist	update_playlist
+6072	what's the nutritional info for pizza	nutrition_info
+6079	what's the minimum payment for my internet bill	min_payment
+6111	what is the timezone in las vegas	timezone
+6138	i wanna apply for a new credit card	new_card
+6155	this was a nice chat, goodbye	goodbye
+6156	what kinds of hobbies do you enjoy	what_are_your_hobbies
+6174	what type of gas does the car use	gas_type
+6180	tell me what's on my shopping list	shopping_list
+6193	what benefits does my insurance have	insurance
+6218	what are you, a bot or human	are_you_a_bot
+6228	can you please speed up your speech settings	change_speed
+6242	set a reminder for me to take my meds	reminder_update
+6249	what type of gas do i need for this car	gas_type
+6256	can you translate i love you into french for me	translate
+6266	i know it could be either one	maybe
+6270	tell me what is on my reminder list	reminder
+6286	please change your language setting to russian	change_language
+6302	where can i find a w2 form	w2
+6303	what hobbies do you like doing	what_are_your_hobbies
+6313	thank you for your time	thank_you
+6318	what is the apr to my credit card	apr
+6358	please play the next song on this playlist	next_song
+6371	what must i do to report my card lost	report_lost_card
+6380	i enjoyed our talk, goodbye	goodbye
+6402	what do i have planned on my calendar for next sunday	calendar
+6433	i want you to reset to factory settings	reset_settings
+6436	what sorts of hobbies do you enjoy	what_are_your_hobbies
+6454	can you suggest a restaurant for me to eat tonight	restaurant_suggestion
+6459	can i redeem my credit card points to cash	redeem_rewards
+6460	i am hungry and need a restaurant suggestion	restaurant_suggestion
+6461	where do i report fraud on my credit card	report_fraud
+6481	what is my citigroup card's rewards balance	rewards_balance
+6494	can you repeat what you said	repeat
+6516	the date tomorrow is what	date
+6532	for what person do you work	who_do_you_work_for
+6549	i need to know my income	income
+6552	what is the expiration date on my visa card	expiration_date
+6569	what benefits are available with my insurance	insurance
+6595	i need an uber for 6 people to the movies	uber
+6597	i'd like to change the ai name	change_ai_name
+6598	when am i due for a tire change	tire_change
+6608	what hobbies do you enjoy in your free time	what_are_your_hobbies
+6628	set a timer for 35 minutes	timer
+6632	give me a fun fact about otters	fun_fact
+6635	what is the apr on my master card	apr
+6643	can you help me book a car rental in paris	car_rental
+6653	please turn the volume to 4	change_volume
+6657	i want you to tell me about my income	income
+6671	i need to rollover my 401k to a new job	rollover_401k
+6674	could you let me know how many pto days do i have left	pto_balance
+6678	can you make a phone call to kevin	make_call
+6697	add apples to my to do shopping list	shopping_list_update
+6709	no, that's not right	no
+6715	do i need an international visa to go to malaysia	international_visa
+6734	tell me a joke about cats	tell_joke
+6742	what's my bank balance	balance
+6760	remove the sync from my phone	sync_device
+6762	find list of ingredients i would need to bake a funnel cake	ingredients_list
+6780	what types of hobbies do you enjoy	what_are_your_hobbies
+6805	will you roll a 12 sided dice	roll_dice
+6814	how long does it take to get to phoenix by bus	distance
+6821	ai, how many months old are you	how_old_are_you
+6845	how can i get my w2 to do my taxes	w2
+6848	how many tablespoons are in a cup	measurement_conversion
+6864	i want to put in a request for pto from may 5 to may 12	pto_request
+6885	what to do if i lost my luggage	lost_luggage
+6888	i can't use my damaged card	damaged_card
+6897	what is the apr on my amex card	apr
+6902	show me my credit score	credit_score
+6906	please make a phone call to christopher	make_call
+6913	how much money do i pay in taxes, please	taxes
+6940	do you work for anyone else	who_do_you_work_for
+6942	what's the weather today	weather
+6948	i can not use my card since it is damaged	damaged_card
+6958	where were you created	where_are_you_from
+6966	does my visa have international transaction fees	international_fees
+6987	could you please switch to whisper mode	whisper_mode
+6997	i'm out of razors so will you order me some more	order
+7019	i need a flight from nyc to paris with delta	book_flight
+7038	can you tell me a fun fact about elephants	fun_fact
+7050	can you switch to whisper mode	whisper_mode
+7055	how long will it take to get to phoenix	distance
+7069	how long will the turkey take to cook	cook_time
+7080	how is my tire pressure	tire_pressure
+7096	what is the exchange rate in pesos for 100 dollars	exchange_rate
+7135	put carrots on my shopping list	shopping_list_update
+7148	i want to apply for a new credit card	new_card
+7150	tell me how much pto i've used	pto_used
+7160	i want to know how to rollover my 401k	rollover_401k
+7161	how busy is ihop at 5 pm	how_busy
+7163	what is the balance of my bank account	balance
+7170	set the volume to 4 please	change_volume
+7175	when will i need to change my tires again	tire_change
+7182	can you please change you accent to the male british one	change_accent
+7192	what is the credit limit on my discover card	credit_limit
+7207	tell me a fun fact about the olympics	fun_fact
+7209	i need to put in a pto request for march 4 to march 6	pto_request
+7263	how long will it take me to get to phoenix	distance
+7271	how old are you siri	how_old_are_you
+7304	what is the credit limit on my visa	credit_limit
+7306	erase all items on my todo list	todo_list_update
+7320	could you roll a 6 sided dice	roll_dice
+7329	what time is it in the pacific timezone	time
+7344	what's the right spelling of rambunctious	spelling
+7346	i'm going out of country, what type of outlet plug do i need	plug_type
+7360	please transfer $50 to my checking account from credit	transfer
+7388	what is the apr on my chase card	apr
+7394	how much is my income	income
+7407	what type of gas does this car take	gas_type
+7419	can you help me change my credit limit	credit_limit_change
+7436	can you find me a recipe for quiche	recipe
+7463	when did i last take my car in for maintenance	last_maintenance
+7465	no, that is not right	no
+7467	what is the meaning of this life	meaning_of_life
+7470	give me some awesome travel destinations	travel_suggestion
+7480	please tell me a really fun fact about facebook	fun_fact
+7505	can you translate hello into swedish for me	translate
+7535	i'm not going to cook today, can you suggest a restaurant	restaurant_suggestion
+7550	will you roll a 6 sided dice	roll_dice
+7560	will you tell me who made the ai	who_made_you
+7578	i need to change my pin number for my savings account	pin_change
+7580	share my location with ma	share_location
+7620	i need to rollover my 401k	rollover_401k
+7629	i want to pay my insurance bill	pay_bill
+7634	how long is it until payday	payday
+7648	i really appreciate your help, thank you	thank_you
+7661	is my tire pressure in the correct range	tire_pressure
+7689	please change my name to loverboy	change_user_name
+7692	i want my credit score	credit_score
+7702	what is my kohls card's rewards balance	rewards_balance
+7704	set a reminder for me to do this in a bit	reminder_update
+7722	what is the expiration date on my credit card	expiration_date
+7725	does michael's accept reservations	accept_reservations
+7735	suggest a restaurant for me to eat tonight, please	restaurant_suggestion
+7749	tell me what is on my todo list	todo_list
+7751	how do i get to the mall by bus	directions
+7759	what name should i use to address you	what_is_your_name
+7760	how do i find when my electric bill is due	bill_due
+7762	i need to set up direct deposit	direct_deposit
+7766	can i cancel my reservation for 4 at red robin	cancel_reservation
+7770	i need guidance on how to rollover my 401k	rollover_401k
+7800	how's my tire pressure	tire_pressure
+7828	can i make a reservation for 6 pm on the 21st at sidetracks	restaurant_reservation
+7856	can you tell me, what is the meaning of life	meaning_of_life
+7859	add sprite to my shopping list	shopping_list_update
+7867	i need to know why my card was declined	card_declined
+7904	what are my chase cards fees for international transactions	international_fees
+7917	what plug type should i use in england	plug_type
+7932	book delta ticket madison to atlanta	book_flight
+7936	what is the traffic like on the way to makaha	traffic
+7940	don't sync to my phone anymore	sync_device
+7988	how do i get to the museum by bus	directions
+7991	i think my account is blocked	account_blocked
+7997	how busy is imanas tei at 7 dinner	how_busy
+8009	what type of gas do i need to use in this car	gas_type
+8010	i want you to cancel the current action	cancel
+8029	i need you to flip a coin	flip_coin
+8053	could you please change your accent to the male british one	change_accent
+8054	help me find my phone	find_phone
+8068	how are things going for you	greeting
+8072	tell me how to change my insurance policy	insurance_change
+8076	how do i know when to change my tires	tire_change
+8077	what information can i ask you	what_can_i_ask_you
+8089	what are the carry-on restrictions for southwest airlines	carry_on
+8107	what's the spelling of cancer	spelling
+8108	what can i do if i lost my luggage	lost_luggage
+8128	tell me the conversion between tablespoons and cups	measurement_conversion
+8131	can you tell me which vaccines i need to take before mexico	vaccines
+8136	i want to change my pin number for my checking account	pin_change
+8160	does my amex card use international transaction fees	international_fees
+8188	when can i put a pto request in for feb 22 to march 1	pto_request
+8195	what is my gymboree card's rewards balance	rewards_balance
+8196	what do i have on my calendar for february 8	calendar
+8219	please cancel that last task	cancel
+8220	how do i change the oil for my car	oil_change_how
+8226	can you confirm my account's blocked and tell me why	account_blocked
+8227	how much will i pay in state taxes	taxes
+8232	what benefits are provided by my insurance	insurance
+8245	go to the next song on the playlist	next_song
+8249	i'm going to paris, what plug type do i need	plug_type
+8255	can you schedule a meeting for me	schedule_meeting
+8259	my credit card application has what status	application_status
+8273	i need to pay my bill	pay_bill
+8279	no, that is inaccurate	no
+8283	please set a timer for 20 minutes	timer
+8301	tell me a fun fact about tigers	fun_fact
+8302	what type of plug do i need when in rome	plug_type
+8318	how do i change the speed of my ai's voice	change_speed
+8324	may i apply for a new credit card	new_card
+8334	how long until you send me a replacement card	replacement_card_duration
+8344	what ingredients do i need to make pancakes	ingredients_list
+8375	how much gas to i have left	gas
+8380	can i substitute rice milk for milk	ingredient_substitution
+8393	i'm traveling to england soon and want to inform my bank	travel_notification
+8403	what's the routing number for my bank of the west account	routing
+8409	for march 1 to 2 make a pto request for me	pto_request
+8428	how many years old are you	how_old_are_you
+8437	please change your accent to the male british one	change_accent
+8439	how do i find out my rewards balance on my chase card	rewards_balance
+8451	i lost my card, how do i report it	report_lost_card
+8453	what's the artist's name of this song	what_song
+8468	can i make a reservation for 2 at state bird for 8:30	restaurant_reservation
+8475	can you give me a spelling for antipathy	spelling
+8491	what is the weather like in denver	weather
+8494	find me a hotel in kansas city with good reviews	book_hotel
+8498	how long will eggs last in the fridge	food_last
+8503	please set an alarm for 2 pm for me	alarm
+8510	please tell me the status of my southwest flight	flight_status
+8516	how long will it take to get to tacoma	distance
+8542	put in a pto request for march 4 to march 6	pto_request
+8559	when do i need you change my oil	oil_change_when
+8567	what is my car's tire pressure	tire_pressure
+8574	what is the balance in my pnc account	balance
+8594	what is on my shopping list	shopping_list
+8595	what's the name of the song you're playing	what_song
+8613	i want you to play the next song on this playlist	next_song
+8629	i need to order more checks for my usbank account	order_checks
+8632	how long does it take to get to houston by bus	distance
+8642	where do i go to get my w2 for tax reasons	w2
+8689	how do i change my car oil	oil_change_how
+8695	i'm out of detergent so will you order me some more	order
+8700	that's a yes from me	yes
+8704	i appreciate your help, thank you	thank_you
+8765	can you tell me the nutrition info for pork sausage	nutrition_info
+8788	what will be the date tomorrow	date
+8796	transfer $5 from savings to checking	transfer
+8809	disconnect sync from my phone	sync_device
+8819	i'd like to order more checks for my savings account	order_checks
 8839	turn on the tv please	smart_home
+8859	can you play music by the rolling stones	play_music
+8874	i'm out of shampoo so will you order me some more	order
+8880	can i substitute cream for milk	ingredient_substitution
+8881	i'm traveling to belgium soon and want to inform my bank	travel_notification
+8890	tell me a fun fact about the moon landing	fun_fact
+8900	that's not right, so no	no
+8908	i want to order some more checks for my savings account	order_checks
+8928	what name should i call you	what_is_your_name
+8947	who you work for, please	who_do_you_work_for
+8960	i need to pay my cable bill	pay_bill
+8966	show me my transactions on tacobell	transactions
+8967	how much mpg does this car get on the highway	mpg
+8974	what is the status of my online order	order_status
+8977	ai can you help me find my phone	find_phone
+8989	check to see when my car was last in the shop	last_maintenance
+8994	get me an uber to the airport	uber
+9009	please connect to my phone	sync_device
+9021	what's the minimum payment on my credit card bill	min_payment
+9025	i intend to learn how to change oil in my car	oil_change_how
+9027	what do i do to jump start my car	jump_start
+9029	please tell me my current location	current_location
+9038	on my chase bank account what is the interest rate	interest_rate
+9057	i need you to add creamer to my shopping list	shopping_list_update
+9061	how many calories are in cake	calories
+9066	it could be either, i think	maybe
+9067	please cancel my dinner reservation	cancel_reservation
+9077	instead of pepper, can i use salt	ingredient_substitution
+9084	i want to pay my car bill	pay_bill
+9124	what is the square root of 66	calculator
+9125	can you tell me where you were born	where_are_you_from
+9132	how much mpg does this car get in the city	mpg
+9142	i need to book a car rental in las vegas	car_rental
+9143	how much do i pay in taxes	taxes
+9161	what's the point balance on my marriot rewards card	rewards_balance
+9183	how much pto do i have used up	pto_used
+9196	can you make a phone call to dave	make_call
+9272	how can i know my current location	current_location
+9278	is it time for a tire change	tire_change
+9304	what is the next holiday	next_holiday
+9308	what's on my meeting schedule today	meeting_schedule
+9339	how can i improve my credit score	improve_credit_score
+9350	what's the minimum payment on my gas bill	min_payment
+9357	i need to know how to report fraud on my discover card	report_fraud
+9367	how busy is kaya around 5 pm	how_busy
+9400	can you play music the beatles	play_music
+9422	can you turn on the lights in the den	smart_home
+9434	tell me a fun fact about butterflies	fun_fact
+9436	set an alarm for me please	alarm
+9463	how many calories are in a piece of bacon	calories
+9471	tell me where you were born	where_are_you_from
+9480	how many calories are in waffles	calories
+9482	can you raise your speaking speed	change_speed
+9490	what type of plug do i need to bring if i visit japan	plug_type
+9493	i'm not sure which one because it could be either of them	maybe
+9510	help me find a hotel in columbus with good reviews	book_hotel
+9519	transfer $20000 from my savings account to checking account	transfer
+9540	what is the square root of 144	calculator
+9541	i need to change my pin number for my checking account	pin_change
+9574	what is my credit limit on my discover card	credit_limit
+9594	i want you to order everything on my shopping list	order
 9599	use delta to book me a flight from dallas to pittsburgh	book_flight
+9600	what mpg does this car get on the expressway	mpg
+9601	what are the rules for carry on luggage	carry_on
+9606	how much is my cable bill	bill_balance
+9611	what's a good restaurant nearby	restaurant_suggestion
+9635	please list ingredients for broccoli cheddar soup	ingredients_list
+9694	what is the spelling of potato	spelling
+9698	what are some suggestions for places to travel	travel_suggestion
+9705	what is my income from work	income
+9713	i need the routing number for my woodlawn account	routing
+9759	how many centimeters are in 4 inches	measurement_conversion
+9767	how do i find when my medical bill is due	bill_due
+9772	how can i order some more checks for my checking account	order_checks
+9774	please get me an uber to get to the movies	uber
+9781	can you tell me my spending history from last week	spending_history
+9785	what is the credit limit for my usaa card	credit_limit
+9790	can i freeze my bank account	freeze_account
+9799	i need to cancel my dinner reservation	cancel_reservation
+9813	whats the status of my frontier flight	flight_status
+9827	i did not catch that, repeat what you just said	repeat
+9852	can you find me a recipe for ribs	recipe
+9859	how do i get my rewards balance on my diner's club card	rewards_balance
+9871	how do i find my income	income
+9877	what's the routing number for my bank of america account	routing
+9894	how many meters are in 2 inches	measurement_conversion
+9931	when should i change my oil next	oil_change_when
+9933	how long does it take to cook a pork chop	cook_time
+9942	change to whisper mode	whisper_mode
+9959	what is the square root of 8814	calculator
+9967	how is the traffic on the way to the campsite	traffic
+9968	when is it time for a tire change	tire_change
+9971	what all is on my shopping list	shopping_list
+9973	please set a timer for 6 minutes	timer
+9997	can you tell me how many pto days do i have left	pto_balance
+10001	what is the apr on my discover card	apr
+10009	what is the square root of 888	calculator
+10015	my luggage is lost,what do i do now	lost_luggage
+10016	does bjs take reservations	accept_reservations
+10034	i have to add farm trip to my calendar for friday	calendar_update
+10037	i must order some more checks for my checking account	order_checks
+10048	how many days of pto have i used	pto_used
+10069	can you translate milk into spanish for me	translate
+10070	how long does bread last	food_last
 10079	is there a travel alert for canada	travel_alert
+10089	what is the minimum payment on my phone bill	min_payment
+10104	what's the interest rate on my savings	interest_rate
+10111	can you translate hi into spanish for me	translate
+10114	what ingredients do i need to make egg salad	ingredients_list
+10145	how long will steaks last in the freezer	food_last
+10153	what is the amount of gas i have	gas
+10154	what benefits are associated with my insurance	insurance
+10155	tell me my credit score	credit_score
+10164	what is the status of my order	order_status
+10172	can i improve my credit score	improve_credit_score
+10177	i want to change my credit limit	credit_limit_change
+10178	what is the limit on my credit	credit_limit
+10211	how do i set up direct deposit to my chase account	direct_deposit
+10247	when do i need my next oil change	oil_change_when
+10252	what is the rate of interest on my savings account	interest_rate
+10256	will you roll a 5 sided dice	roll_dice
+10264	how old are you exactly	how_old_are_you
+10275	can you help me find my lost phone	find_phone
+10291	tell me if i need any more vaccines if i go there	vaccines
+10293	how much longer until the next payday	payday
+10313	translate hello into french for me	translate
+10316	how long does it take to get to dallas by bus	distance
+10332	tell me what type of gas this car uses	gas_type
+10351	please cancel my dinner reservation for tuesday	cancel_reservation
+10354	what's my income from work	income
+10363	do i have any birthdays on my todo list	todo_list
+10365	what's the weather like	weather
+10372	please change my name to tom	change_user_name
+10386	are the reviews for mi casita good	restaurant_reviews
+10412	how long does it take to get to the airport in dallas	distance
+10415	can you play music by the beatles	play_music
+10433	do you have different kinds of pets	do_you_have_pets
+10450	how long does it take pork to cook	cook_time
+10457	what hobbies do you like	what_are_your_hobbies
+10459	i would like you to increase the speed of your speech please	change_speed
+10471	how long before i can get a replacement card	replacement_card_duration
+10481	check the status of my credit card application please	application_status
+10507	i have been spending a lot on insurance lately	spending_history
+10534	what do i have left in the gas tank	gas
+10539	please roll a 6 sided dice	roll_dice
+10540	how busy will panera be at noon	how_busy
+10544	kind of what pets do you have	do_you_have_pets
+10549	can you book a table at the restaurant for me and my husband	restaurant_reservation
+10550	what name do you want me to call you	what_is_your_name
+10552	what is the amount of pto have i used	pto_used
+10561	i need to jump start my car what do i do	jump_start
+10575	what do i have on my reminder list	reminder
+10579	if you flip a coin, i call tails	flip_coin
+10580	it was a pleasure talking to you, goodbye now	goodbye
+10588	what is the answer to the meaning of life	meaning_of_life
+10598	how are things treating you	greeting
+10609	how do i report fraud on my discover card	report_fraud
+10629	what is the correct spelling of the word: dessert	spelling
+10658	do you know where you were born	where_are_you_from
+10671	what is my bank balance	balance
+10693	what is the city mpg for this car	mpg
+10703	take everything off my todo list	todo_list_update
+10715	what is the exchange rate between rubles and us dollars	exchange_rate
+10740	how can i schedule a meeting	schedule_meeting
+10747	share my location with apple	share_location
+10785	where can i find my w2	w2
+10797	tell me my current location please	current_location
+10803	so what name do you have for me	user_name
+10835	i'd like to see if there's a travel alert for the country	travel_alert
+10850	i need an uber to the doctor	uber
+10857	set an alarm for 9pm please	alarm
+10873	set a timer for two minutes	timer
+10893	show me my transactions on make up at sephora	transactions
+10922	what is the current exchange rate for the dollar and the yen	exchange_rate
+10923	i need to transfer from one account to my second one	transfer
+10936	how are you this day	greeting
+10951	translate hello in french	translate
+10963	what date is the next payday	payday
+10997	can you please freeze my account	freeze_account
+11002	what's the name of the song playing right now	what_song
+11025	what can i ask you to accomplish	what_can_i_ask_you
+11044	tell me what the date will be tomorrow	date
+11049	what's the conversion from inches to centimeters	measurement_conversion
+11062	what types of things can i ask you	what_can_i_ask_you
+11065	how long does it take to get a replacement card	replacement_card_duration
+11071	turn lights on in the garage	smart_home
+11091	find my credit score	credit_score
+11101	how busy is orchids at 7	how_busy
+11104	thank you for helping me	thank_you
+11129	how much is the bill for my water and electricity	bill_balance
+11132	i must apply for a new credit card	new_card
+11143	show me my transactions on groceries	transactions
+11157	what do i do to find my current location	current_location
+11159	put a device with my phone	sync_device
+11181	when's my next payday	payday
+11198	what is the mpg for this car in city	mpg
+11205	i'm traveling tony soon and want to inform my bank	travel_notification
+11209	add this song to my rainy day playlist	update_playlist
+11226	can you give me a burmese meal suggestion, please	meal_suggestion
+11232	what is the plug type in france	plug_type
+11238	what is the tire pressure in my car	tire_pressure
+11245	can you add cherrios to my shopping list	shopping_list_update
+11248	i am trying to find out when is the next payday	payday
+11252	how many ounces are in a cup	measurement_conversion
+11265	what is the status of my credit card application	application_status
+11281	speak back to me what's on my reminder list	reminder
+11286	when is the next payday	payday
+11329	how many pto days do i have for the year	pto_balance
+11334	i want you to send a text message for me	text
+11341	i need a timer set for 15 minutes	timer
+11342	what's the best place to travel to this time of year	travel_suggestion
+11348	what is my interest rate	interest_rate
+11352	my water and electricity bill is how much	bill_balance
+11367	i want to book a hotel in tampa from may 2 to may 4	book_hotel
+11395	what is the apr on my citibank card	apr
+11405	please disconnect from my phone	sync_device
+11410	book me a hotel with good ratings in nashville	book_hotel
+11415	what's on my calendar for tuesday	calendar
+11419	i want to report fraud on my american express	report_fraud
+11420	tell me a joke about politicians	tell_joke
+11423	i need you to change your accent to the male british one	change_accent
+11427	what benefits does my insurance provide	insurance
+11435	help me find a hotel in that has good reviews in columbus	book_hotel
+11450	change to a male british accent	change_accent
+11455	what name would you like me to call you	what_is_your_name
+11474	what is the max credit limit for my card	credit_limit
+11512	does my chase card have international transaction fees	international_fees
+11520	i want an italian meal suggestion	meal_suggestion
+11529	could you tell me how many pto days do i have left	pto_balance
+11569	how are the reviews for mcdonald's	restaurant_reviews
+11604	how many calories are in a cookie	calories
+11609	how do i get direct deposit set up	direct_deposit
+11624	how i do schedule car maintenance	schedule_maintenance
+11643	is there a travel alert for north korea	travel_alert
+11652	i want to change your name	change_ai_name
+11666	change the speaker volume to a louder one	change_volume
+11670	add this song to my jazz playlist	update_playlist
+11671	how shall i find my current location	current_location
+11684	how can i redeem my credit card points	redeem_rewards
+11703	wipe my todo list please	todo_list_update
+11710	i can not use my card, it is damaged	damaged_card
+11725	can you please cancel	cancel
+11727	help, i lost my luggage	lost_luggage
+11754	what are the carry on limits for delta flights	carry_on
+11761	when should i change my oil again	oil_change_when
+11767	can you send a text to someone	text
+11782	ai, how are you feeling	greeting
+11790	i need to add farm trip to my calendar for friday	calendar_update
+11799	thank you for the help	thank_you
+11809	how can i change my car oil	oil_change_how
+11814	can you report credit card fraud for me	report_fraud
+11816	whats the status of my singapore flight	flight_status
+11820	proceed to the next song on this playlist	next_song
+11838	transfer $10 from checking to savings	transfer
+11840	i think i lost my luggage	lost_luggage
+11843	my card is lost how do i report it	report_lost_card
+11862	change the name that you call me	change_user_name
+11874	what is the conversion for pints to quarts	measurement_conversion
+11901	what is the date tomorrow	date
+11933	whats the status of my united flight	flight_status
+11945	i need you to find me a recipe for fried shrimp	recipe
+11946	book me a flight from o'hare to las vegas on deltacom	book_flight
+11954	i want to know the nutrition info for chicken nuggets	nutrition_info
+11969	what name should i use to call for you	what_is_your_name
+11990	are there international transactions fees for rainbow card	international_fees
+12005	when was my car in the shop last	last_maintenance
+12019	please change your accent to a british male	change_accent
 12037	i need to book a car rental in boston	car_rental
+12046	tell me a joke about rats	tell_joke
+12062	how much gas do i currently have	gas
+12063	when was my last maintenance on my car in the shop	last_maintenance
+12081	whats the expiration date on my credit card	expiration_date
+12082	i need to rollover my 401k because i got a new job	rollover_401k
+12112	i gotta apply for a new credit card	new_card
+12115	do i need to get vaccines before my trip	vaccines
+12130	can you give me a thai meal suggestion	meal_suggestion
+12150	can you confirm my reservation for chillis at 8:00	confirm_reservation
+12155	please cancel my reservation for chris at brio	cancel_reservation
+12156	what's my monthly income	income
+12165	on pets, what kind do you have	do_you_have_pets
+12171	set a reminder to feed the dogs	reminder_update
+12172	book a flight from la to madrid with southwest	book_flight
+12188	can you delete my todo list please	todo_list_update
+12189	what is the current status of my vacation request	pto_request_status
+12190	how old are you alexa	how_old_are_you
+12207	could you skip to the next song on this playlist	next_song
+12212	what's my interest rate	interest_rate
+12214	place a phone call to yiming	make_call
+12219	do you know how much i pay in taxes	taxes
+12224	how busy is jiro at 12 lunch time	how_busy
+12237	i need you to get me a rental car in nashville	car_rental
+12256	you have what name for me	user_name
+12259	where can i find my phone	find_phone
+12260	can you schedule a meeting with steve for 5	schedule_meeting
+12279	yes, that's what i want	yes
+12294	what name would you like me to use	what_is_your_name
+12301	i want you to call bella	make_call
+12303	when will you mail me a replacement card	replacement_card_duration
+12308	what's the date tomorrow	date
+12309	can you please speed up your speech	change_speed
+12324	change your language setting to spanish	change_language
+12340	how is the traffic on the way to the mall	traffic
+12343	can i make a change to my credit limit	credit_limit_change
+12345	can i make a reservation for 8 pm at red robin for 3	restaurant_reservation
+12349	set an alarm for 5 pm	alarm
+12380	what's my total income	income
+12436	i need to hear my todo list	todo_list
+12440	please cancel that last command	cancel
+12443	tell me where you were created	where_are_you_from
+12449	how do i jump start my battery	jump_start
+12461	do i need cables to jump start my car	jump_start
+12466	how do i redeem my credit card points	redeem_rewards
+12469	what is my maurices card's rewards balance	rewards_balance
+12475	what is the time in paris now	time
+12510	send a text to someone	text
+12512	i need to apply for a new credit card	new_card
+12525	ai, how are you doing	greeting
+12535	tell me why my card was declined	card_declined
+12555	can you give me a thai meal suggestion, please	meal_suggestion
+12560	what is the routing number for my wells fargo account	routing
+12568	i would like to apply for a new credit card	new_card
+12572	on my shopping list, remove bread and add milk	shopping_list_update
+12574	what's the spelling of multimedia	spelling
+12593	set a reminder to take out the trash	reminder_update
+12595	how long it takes to get a new replacement card	replacement_card_duration
+12622	what is my meeting schedule today	meeting_schedule
+12633	can you translate cat into russian for me	translate
+12647	what do you do for hobbies	what_are_your_hobbies
+12680	can you find a keto friendly restaurant	restaurant_suggestion
+12686	please transfer $5 from savings to checking	transfer
+12713	i have been spending a lot on food out lately	spending_history
+12726	share the nutrition info for french fries with me	nutrition_info
+12728	find me a hotel in seattle with great reviews	book_hotel
+12743	what is the current status of my credit card application	application_status
+12744	what is the weather going to be like	weather
+12748	thank you for the chat, goodbye	goodbye
+12785	i'd like to redeem my credit card points	redeem_rewards
+12792	how busy is mc donald at 8 in the morning	how_busy
+12801	can you make a phone call to mark	make_call
+12810	do i need an international visa to go to england	international_visa
+12845	what is the definition of succumb	definition
+12849	i want directions to the closest atm	directions
+12852	in nashville, i need a rental car booked	car_rental
+12856	what's the minimum payment on my bill	min_payment
 12860	how do i jump start my car battery	jump_start
+12867	how do i find when my cable bill is due	bill_due
+12879	tell me what's on my reminder list	reminder
+12882	do i have anything on my todo list	todo_list
+12888	what's the name of this song	what_song
+12920	can you please dim the lights	smart_home
+12923	switch to whisper mode, please	whisper_mode
+12942	i need to pay my water bill	pay_bill
+12949	please flip a coin - i call heads	flip_coin
+12998	what's the credit limit on my discovery card	credit_limit
+13000	how can i jump start my car	jump_start
+13013	can i put in a pto request for may 1 to may 5	pto_request
+13020	what name do you have listed for me	user_name
+13022	what kind of questions can i ask you	what_can_i_ask_you
+13025	redeem my credit card rewards into my account	redeem_rewards
+13035	update my shopping list, delete canned olives	shopping_list_update
+13051	that's a definite yes	yes
+13055	what kind of plug type do they use in russia	plug_type
+13060	what's the definition of analogy	definition
+13075	what's the status of my united flight	flight_status
+13076	are the reviews for applebee's good	restaurant_reviews
+13078	when do i need to change my tires	tire_change
+13088	what are ways to improve my credit score	improve_credit_score
+13089	you need to change your accent to the male british one	change_accent
+13100	are you a real person or a bot	are_you_a_bot
+13101	how much pressure is in my car's tire	tire_pressure
+13105	i lost my luggage, what now	lost_luggage
+13106	i need you to reset your factory settings	reset_settings
+13113	does mcdonalds take reservations	accept_reservations
+13114	what plug type would i use in japan	plug_type
+13117	is there a travel alert for scotland	travel_alert
+13119	do i need an international visa to go to vietnam	international_visa
+13136	can you help me book a car rental in seattle	car_rental
+13162	do you work for a different employer	who_do_you_work_for
+13170	add this song to my post-rock playlist	update_playlist
+13171	what is the balance of my bank accounts	balance
+13190	how long does it take to cook hot pockets	cook_time
+13191	i need to report that my card is lost	report_lost_card
+13202	what's on my shopping list	shopping_list
+13209	i cant remember when my bill is due	bill_due
+13248	what hobbies do you have	what_are_your_hobbies
+13249	please change your language setting to spanish now	change_language
+13261	where do i get w2 form	w2
+13264	can you find me a hotel in columbus with good reviews	book_hotel
+13270	can you repeat that please	repeat
+13291	what type of gas does this car need	gas_type
+13299	i want to go to korea, do i need an international visa	international_visa
+13309	change my credit limit, please	credit_limit_change
+13348	can you inform if boston restaurant has good reviews	restaurant_reviews
+13349	what is the weather like tomorrow	weather
+13363	what is the status of my most recent order	order_status
+13389	what is the balance on my bank accounts	balance
+13406	skip this song and play the next	next_song
+13429	please set an alarm for 5 am	alarm
+13448	what amount of gas do i have left	gas
+13466	give me my credit score	credit_score
+13467	have i added anything to my todo list	todo_list
+13469	what is the timezone for quito	timezone
+13472	find me a flight from ft lauderdale to houston on southwest	book_flight
+13480	what are the directions to get to olympia by bus	directions
+13490	i want to put in a pto request for march 1-8	pto_request
+13491	should i get any vaccines before going over to the uk	vaccines
+13503	how long does it take to cook ham	cook_time
+13505	what do i need to do to rollover my 401k	rollover_401k
+13536	what is my meeting schedule like for the day	meeting_schedule
+13552	can you roll a 6 sided dice	roll_dice
+13555	how to improve my credit score	improve_credit_score
+13571	can you find me my phone	find_phone
+13572	yes, that is true for sure	yes
+13579	when is the expiration date for my visa card	expiration_date
+13580	i need help to pay my electric bill	pay_bill
+13591	do you work for another individual	who_do_you_work_for
+13603	i want you to read my reminder list to me	reminder
+13673	what time is it in the pacific standard timezone	time
+13719	how many calories are in cookies	calories
+13723	what's the exchange rate between dollars and pesos	exchange_rate
+13730	what's the routing number for my usaa account	routing
+13735	what are the carry on rules for united	carry_on
+13740	what is the square root of 31	calculator
+13755	show me the last five transactions	transactions
+13767	what is the square root of 104	calculator
+13791	please help me find my phone	find_phone
+13811	in tokyo, what time is it	time
+13815	the timezone of italy is what	timezone
+13826	i've used how much pto so far	pto_used
+13843	i'm out of soap so will you order me some more	order
+13860	i need directions to get to olympia by bus	directions
+13861	no, that is my response	no
+13871	tell me a joke about dogs	tell_joke
+13900	help me find my phone please	find_phone
+13928	i am nost sure why my account is blocked	account_blocked
+13929	get an uber to the airport	uber
+13939	i'd like to put a freeze on my bank account	freeze_account
+13952	i'm out of toothpaste so will you order me some more	order
+13984	i would have to say the answer to that is no	no
+14003	what is my balance in checking account	balance
+14008	what and when is the next holiday	next_holiday
+14016	how much do i pay the government in taxes	taxes
+14029	is there a travel alert for spain	travel_alert
+14030	can you check the balance on the water bill	bill_balance
+14034	what is the status of my vacation time request	pto_request_status
+14037	i'd like to reset to factory settings	reset_settings
+14052	can you give me a vietnamese meal suggestion, please	meal_suggestion
+14063	what's the routing number for my checking account	routing
+14070	reset to factory settings	reset_settings
+14072	where should i travel to next	travel_suggestion
+14078	what is the conversion of inches to centimeters	measurement_conversion
+14096	tell me what the date is tomorrow	date
+14117	do i need an international visa to go to tibet	international_visa
+14141	what is the name of this song	what_song
+14143	what is the weather in atlanta	weather
+14149	how busy is imanas at 6	how_busy
+14168	the new name that i want you to call me is this one	change_user_name
+14169	help me please, my account is blocked	account_blocked
+14170	can you play the beatles	play_music
+14189	what do you have my name saved under	user_name
+14195	what day is the next holiday	next_holiday
+14215	how are you doing today, ai	greeting
+14243	reset to original settings	reset_settings
+14302	i'm saying goodbye now	goodbye
+14312	can you play music by bob dylan	play_music
+14322	what different pets do you have	do_you_have_pets
+14344	please give me the full balance on my water bill	bill_balance
+14347	do i have an item on my todo list related to shopping	todo_list
+14351	i'm pretty sure it could be either	maybe
+14359	where did your parents have you	where_are_you_from
+14361	show me my transactions on clothes at macys	transactions
+14364	my response to that is yes	yes
+14371	how much do i pay in my taxes	taxes
+14389	switch to whisper mode	whisper_mode
+14397	yes, that is accurate	yes
+14415	what is the name that you have for me	user_name
+14423	what is the status of my frontier flight	flight_status
+14437	what benefits do i have with my insurance	insurance
+14443	how is the traffic on the way to work	traffic
+14456	provide me the name of who made you	who_made_you
+14466	would you order everything on my shopping list	order
+14496	what is the square root of 80	calculator
+14559	add this song to my cleaning playlist	update_playlist
+14571	what is the credit limit for my chase card	credit_limit
+14588	is the traffic bad on the way to work	traffic
+14591	why is my account blocked	account_blocked
+14614	tell me what i have on my todo list	todo_list
+14631	i need you to send a text	text
+14666	what do i do to rollover my 401k	rollover_401k
+14668	what is the track title of the song playing	what_song
+14705	am i going to need vaccines for the trip	vaccines
+14708	i want to report my discover card as lost	report_lost_card
+14714	what if i lost my luggage	lost_luggage
+14717	tell me how i can schedule a meeting	schedule_meeting
+14726	what is the minimum payment i can make on my electric bill	min_payment
+14737	read my reminder list to me	reminder
+14739	i'm traveling to ca soon and want to inform my bank	travel_notification
+14740	do you have many kinds of pets at your house	do_you_have_pets
+14743	i want you to call me this new name	change_user_name
+14746	how many calories are in cheerios	calories
+14773	nuke all items on my todo list	todo_list_update
+14787	i need a pto request on march 1 to 2	pto_request
+14798	when should i try to change my tires	tire_change
+14815	what is my amazon card's rewards balance	rewards_balance
+14818	where should i travel if i want to go to a nice beach	travel_suggestion
+14821	up to this point, how much of my pto have i used	pto_used
+14822	for my water and electricity, how much is the bill	bill_balance
+14847	can you find me a recipe for salsa	recipe
+14861	can you put in a pto request for march 4 to march 6 for me	pto_request
+14867	in what timezone is nigeria	timezone
+14876	how many calories are in a can of coke	calories
+14883	please set a timer for 40 minutes	timer
+14917	what hobbies do you do	what_are_your_hobbies
+14933	what exactly is the meaning of life	meaning_of_life
+14959	who do you consider your employer	who_do_you_work_for
+14987	change the song to the next one on this playlist	next_song
+14989	i need an uber to take me to the mall	uber
+15024	help me change my insurance plan	insurance_change
+15028	what is the song that's playing	what_song
+15032	i need to know if boston restaurant has favorable reviews	restaurant_reviews
+15040	i would like you to give me a suggestion for a mexican meal	meal_suggestion
+15050	no, that information is wrong	no
+15065	check up on the status of my online order	order_status
+15079	what is on my reminder list	reminder
+15100	how long does it take to get to orlando by bus	distance
+15101	don't sync with my phone	sync_device
+15117	cancel my last request, i know the answer	cancel
+15118	what is my chase card's rewards balance	rewards_balance
+15121	what is the apr on my barclay's card	apr
+15138	my card was declined yesterday, why	card_declined
+15139	what is the present status of my credit card application	application_status
+15157	does gramercy tavern accept reservations	accept_reservations
+15179	what's the timezone for brasilia	timezone
+15182	can you find me a recipe for honey ham	recipe
+15184	i'm traveling to sweden soon and want to inform my bank	travel_notification
+15194	do i have brush my teeth on my todo list	todo_list
+15200	i want to thank you for helping	thank_you
+15224	read my reminder list back to me	reminder
+15237	how is my credit score	credit_score
+15240	how can i start my car using a jump start	jump_start
+15260	please freeze my account	freeze_account
+15282	how should i rollover my 401k	rollover_401k
+15290	when should i change my tires	tire_change
+15298	how do i rollover my 401k	rollover_401k
+15321	when did i last do maintenance on my car	last_maintenance
+15325	how long can i leave pizza in the fridge	food_last
+15331	can you make me a reservation for 4 pm on the 22nd at ruth's	restaurant_reservation
+15344	how much is my gas bill	bill_balance
+15369	what is my next payday	payday
+15386	what is the date today	date
+15395	repeat what you just said	repeat
+15424	roll a 10 sided dice	roll_dice
+15429	what are the rules for carry on luggage for delta	carry_on
+15431	i need my credit score	credit_score
+15448	let me know who made you	who_made_you
+15451	on the lounge lights turn	smart_home
+15467	please reset your factory settings	reset_settings
+15468	i want change your name to russ	change_ai_name
+15471	i want to schedule a meeting with tom for 6pm	schedule_meeting
+15475	how are things for you	greeting
+15507	i want to get directions to the closest atm	directions
+15512	how much do i owe on my cable bill	bill_balance
+15514	please cancel what you are doing, i've changed my mind	cancel
+15519	when do i need to change my tires again	tire_change
+15520	how are you doing, ai	greeting
+15524	share my location with mom	share_location
+15539	i want to add farm trip to my calendar for friday	calendar_update
+15542	how much will i have to pay in state taxes	taxes
+15544	i have to schedule some car maintenance	schedule_maintenance
+15555	i have to send a text	text
+15556	what do i have on my list for shopping	shopping_list
+15565	what is the correct spelling for antipathy	spelling
+15581	tell the meaning of life	meaning_of_life
+15594	change your language setting to chinese	change_language
+15598	can you order everything on my shopping list	order
+15619	i need to change my pin number for my account	pin_change
+15630	i want to reset your settings to the original	reset_settings
+15669	how much money do i pay in taxes	taxes
+15682	i need to know how to change my insurance	insurance_change
+15685	help, my account is blocked	account_blocked
+15707	what's the expiration date on my credit card	expiration_date
+15716	let me know why my card was declined yesterday	card_declined
+15740	tell me how to find my current location	current_location
+15764	what things are on my shopping list	shopping_list
+15775	can you suggest some of the most popular travel destination	travel_suggestion
+15793	what's the name of the current song	what_song
+15794	translate for me hello into french	translate
+15796	can you confirm my reservation for kevin at red robin	confirm_reservation
+15821	when do i take my car in for a tire change	tire_change
+15823	do you work for a different person	who_do_you_work_for
+15830	detroit is in what timezone	timezone
+15831	what is the status of my vacation request	pto_request_status
+15839	skip this and go to the next song	next_song
+15844	please change your language setting to spanish	change_language
+15846	thank you for the answer	thank_you
+15848	share my location with steve	share_location
+15868	do i need an international visa to go to brazil	international_visa
+15877	i want to place a call to mike	make_call
+15887	where can i locate a form for my w2	w2
+15895	what is the expiration date of my current card	expiration_date
+15913	what ingredients do i need to make salmon salad	ingredients_list
+15918	what's on my calendar for march 01	calendar
+15925	what's my yearly income	income
+15963	what is the mpg for this car	mpg
+15974	what type of plug do they use in mexico	plug_type
+15980	i lost my card how do i report it	report_lost_card
+15989	how do i change my credit limit	credit_limit_change
+16006	how do i set up direct deposit for my cefcu account	direct_deposit
+16019	what amount of gas do i have in my car	gas
+16021	how many days until my next payday	payday
+16032	yes, that is actually true	yes
+16044	what are the carry-on restrictions for united	carry_on
+16047	how can i order more checks for my regions bank account	order_checks
+16059	can you talk at a normal speed please	change_speed
+16082	i need to put my appointment for tomorrow on my calendar	calendar_update
+16085	i need to send a text	text
+16088	what is the traffic like on the way to kaneohe	traffic
+16102	thank you for your help	thank_you
+16104	turn the fan on please	smart_home
+16132	are you a human or a bot	are_you_a_bot
+16142	i need to know how to change my car's oil	oil_change_how
+16145	what is the meaning of my life	meaning_of_life
+16149	i want you to flip a coin	flip_coin
+16152	my insurance plan is what	insurance
+16156	what's the nutritional info for spaghetti	nutrition_info
+16161	in the eastern timezone, what time is it now	time
+16167	how would i go about spelling malignant	spelling
+16175	italy is in what timezone	timezone
+16187	i need you to play the next song on this playlist	next_song
+16195	how long does bread last in the freezer	food_last
+16215	can you schedule a meeting with matt for 3	schedule_meeting
+16224	does gramercy tavern in new york accept reservations	accept_reservations
+16239	list out what is on my shopping list	shopping_list
+16240	how can i order checks for my savings account	order_checks
+16272	check the status of my order	order_status
+16284	i'm traveling to denmark soon and want to inform my bank	travel_notification
+16298	how long has it been since my last auto maintenance	last_maintenance
+16299	schedule flight from madison to atlanta on delta	book_flight
+16325	please set the volume to 4	change_volume
+16330	can i substitute milk for almond milk	ingredient_substitution
+16335	how busy is shokudo at 12	how_busy
+16341	for friday, add a doctor's appointment to my calendar	calendar_update
+16357	can you find me a recipe for cheese cake	recipe
+16372	how much do i pay in taxes, please	taxes
+16373	cancel my reservation for dinner, please	cancel_reservation
+16375	change the volume to 4 now please	change_volume
+16376	can you make a phone call to randy	make_call
+16380	i want to travel this year but i need some suggestions	travel_suggestion
+16400	can you turn on the lights in the backyard	smart_home
+16427	do i need any vaccines before traveling to brazil	vaccines
+16428	could you repeat what you just said again	repeat
+16434	i need to know when is the next holiday here	next_holiday
+16436	what is the exchange rate between usd and the euro	exchange_rate
+16442	the answer to that is a resounding yes	yes
+16447	tell me who made you	who_made_you
+16452	please set up a timer for me	timer
+16468	how are things with you	greeting
+16522	share my location with google	share_location
+16535	can you check how much pto i have already used	pto_used
+16538	can i change what you call me	change_user_name
+16551	how long will the chicken take to cook	cook_time
+16557	can you make a reservation at the restaurant for tonight	restaurant_reservation
+16577	how many calories are in apples	calories
+16597	set a timer for 15 minutes	timer
+16612	help me to book a car rental in sacremento	car_rental
+16637	please cancel your present task	cancel
+16673	when do i need to change my oil again	oil_change_when
+16680	do you work for another person	who_do_you_work_for
+16685	please find the current balance on my con edison bill	bill_balance
+16696	has the leftover hamburger from last saturday gone bad	food_last
+16698	what type of electrical plug do they use in spain	plug_type
+16702	can you give me a chinese meal suggestion	meal_suggestion
+16759	how much will i pay in federal taxes	taxes
+16767	i want you to change the ai name	change_ai_name
+16775	how old are you, again	how_old_are_you
+16779	can you please check on the status of my online order	order_status
+16794	i need to put a freeze on my banking account	freeze_account
+16797	can you confirm my reservation for minnis at 4:00	confirm_reservation
+16803	what are some hot travel destinations	travel_suggestion
+16812	you need to reset your factory settings	reset_settings
+16821	what is the square root of 2784	calculator
+16876	can you change my credit limit	credit_limit_change
+16881	please tell me my meeting schedule	meeting_schedule
+16917	freeze my bank account	freeze_account
+16924	what is the exchange rate between british pounds and yen	exchange_rate
+16927	do i need an international visa to go to spain	international_visa
+16963	do you work for me or is that wrong	who_do_you_work_for
+16970	do you have any restaurant recommendations	restaurant_suggestion
+16985	what is the status of my delivery order	order_status
+16987	when did i last have car maintenance	last_maintenance
+16988	what's the credit limit on my visa	credit_limit
+17016	will you roll a 4 sided dice	roll_dice
+17030	i want to change your name to another name	change_ai_name
+17046	will you roll a 10 sided dice	roll_dice
+17052	have i been spending a lot on groceries lately	spending_history
+17061	tell me a funny joke about men	tell_joke
+17075	i want to send a text	text
+17122	share my location with my sister	share_location
+17145	what do i have scheduled on march 2nd on my calendar	calendar
+17177	how many days do i have left of pto	pto_balance
+17191	make a reservation for 2 at red lobster at 8pm	restaurant_reservation
+17206	give me a list of international transaction fees for my amex	international_fees
+17214	please change the ai name	change_ai_name
+17225	does ruby tuesday accept reservations	accept_reservations
+17227	i'm sure it could be either	maybe
+17239	confirm my reservation for red robin at 8	confirm_reservation
+17246	i want to change your name, please	change_ai_name
+17263	i got to apply for a new credit card	new_card
+17270	i need to order more checks for my savings account	order_checks
+17286	read my reminder list to me please	reminder
+17289	help me change my insurance	insurance_change
+17293	i wanna know the exchange rate between yen and dollars	exchange_rate
+17320	i got to remove fishing from my calendar for soccer	calendar_update
+17321	can you tell me who made the ai	who_made_you
+17326	i need to change my oil, how do i	oil_change_how
+17356	what is the expiration date on my card	expiration_date
+17358	what are some things to do in portland	travel_suggestion
+17360	it is time to say goodbye	goodbye
+17363	are there recommended vaccines to go there	vaccines
+17376	what is the status of my application for the credit card	application_status
+17392	please change my name	change_user_name
+17397	i want to pay my electric bill	pay_bill
+17405	how do i change the oil in my car	oil_change_how
+17421	i need to schedule a meeting	schedule_meeting
+17443	i need to share my location with noel	share_location
+17447	need to transfer from one account to my other one	transfer
+17455	what did i put on my shopping list	shopping_list
+17461	what's the timezone for london	timezone
+17477	what can i ask you, ai	what_can_i_ask_you
+17518	the apr on my visa card is what	apr
 17524	where can i get a w2 form	w2
+17534	tomorrow, what will the date be	date
+17541	do you know why my account is blocked	account_blocked
+17553	i want you to change your accent to the male british one	change_accent
+17577	what is the amount of balance i have to pay on my bill	bill_balance
+17580	do you think you are a bot	are_you_a_bot
+17586	how many calories are in oreos	calories
+17601	when is the next scheduled holiday, please	next_holiday
+17640	my credit score is what	credit_score
+17643	is a meeting with ruth on my schedule today	meeting_schedule
+17673	how to jump start a car	jump_start
+17677	no that is not right	no
+17691	how old are you again	how_old_are_you
+17695	can you confirm my reservation for torris at 7:00	confirm_reservation
+17698	can you freeze my account, please	freeze_account
+17700	what is my credit score	credit_score
+17716	i'm out of conditioner so will you order me some more	order
+17729	what can i do to improve my credit score	improve_credit_score
+17739	where in the world is there a travel alert	travel_alert
+17752	how long until i get a replacement card	replacement_card_duration
+17760	when was the last time my car was serviced	last_maintenance
+17802	what is my interest rate payment	interest_rate
+17805	thank you for the information	thank_you
+17810	what do i do if my luggage is lost	lost_luggage
+17812	are you human or a bot	are_you_a_bot
+17838	i want to know when is the next holiday	next_holiday
+17847	set an alarm for 6am, please	alarm
+17851	what is the correct spelling of judgment	spelling
+17866	what is the name of the song playing right now	what_song
+17869	when do i need to change my oil next	oil_change_when
+17878	walk me through on how to change my insurance	insurance_change
+17883	show me my transactions on mcdonalds	transactions
+17886	my credit card application status	application_status
+17898	please transfer $250 from checking to savings	transfer
+17913	please file a fraud report	report_fraud
+17935	how can i change my oil in my car	oil_change_how
+17970	what mpg does this car get on the highway	mpg
+17997	what is the minimum payment for the bill	min_payment

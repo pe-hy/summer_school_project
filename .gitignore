@@ -20,6 +20,8 @@ workshop/data/_instructor/
 # instructor-only: names the source corpora / links to the original labels
 workshop/data/README.md
 scripts/build_data.py
+# instructor-only: reads the pool answer key in workshop/data/_instructor/
+scripts/build_labeled_examples.py
 # instructor-only: Haiku labels for pool messages (a partial answer key) + the baseline
 workshop/baseline/
 

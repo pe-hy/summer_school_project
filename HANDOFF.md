@@ -8,9 +8,10 @@ check it is given.
 ## What it is
 
 Students get two datasets of short customer-service messages (Benchmark A and
-Benchmark B). Each message belongs to one category. The training pool ships
-without labels: producing them is part of the project, and an LLM through
-OpenRouter is the intended route. Students train a local model, predict every
+Benchmark B). Each message belongs to one category. The pool ships
+unlabelled apart from a seed set of ten gold rows per category
+(`labeled_examples.tsv`: 770 rows for A, 1,500 for B); labelling the rest is part
+of the project, and an LLM through OpenRouter is the intended route. Students train a local model, predict every
 message in both `test.tsv` files, and upload one JSON file. The server scores it
 against an answer key they never see.
 
@@ -94,6 +95,13 @@ it deliberately ships the two answer-key files and nothing else from
 | `scripts/final_standings.py` | Final ranking from the hidden slice, command line |
 | `update_site.sh`, `deploy/` | Deployment |
 
+Two outbound links are hardcoded in the header of all four static pages
+(`index.html`, `assignment.html`, `guide.html`, `404.html`), with no single source:
+the Materials button points at the Google Drive lecture folder, and the Discord
+button at `https://discord.gg/PSK9Wbcq3s`. A discord.gg invite can expire or be
+revoked, so if the button ever 404s, regenerate the invite (ideally a non-expiring
+one) and update all four files together.
+
 ## Instructor-only, git-ignored, never served
 
 - `workshop/data/_instructor/` answer keys. `test_labels_*.tsv` are deployed so
@@ -103,6 +111,9 @@ it deliberately ships the two answer-key files and nothing else from
 - `workshop/INSTRUCTOR_NOTES.md`. It predates most decisions below and
   contradicts what shipped. History, not instructions.
 - `workshop/data/README.md` and `scripts/build_data.py` name the corpora.
+- `scripts/build_labeled_examples.py` rebuilds the `labeled_examples.tsv` seed
+  sets. It reads `_instructor/pool_labels_*.tsv`, so it is instructor-only for
+  the same reason `build_data.py` is: its output ships, the script does not.
 - `deploy/.admin_key`, `deploy/.pa_token`, `deploy/.edit_password`.
 
 Keep it that way. The assignment asks students not to look up the original
@@ -288,10 +299,15 @@ Do not relitigate these without a reason. Each cost a round of discussion.
 - **Names are not tied to browsers.** A browser token owns at most one row per
   benchmark; a name is claimed by one browser; one browser may hold different
   names over time.
-- **Ten gold-labelled pool examples ship** as `labeled_examples.tsv`, to show the
-  label format. They stay in `pool.tsv` under the same ids, so the documented
-  pool sizes and id ranges are unchanged. Ten rows train nothing; that is the
-  point and the assignment says so.
+- **Ten gold-labelled pool examples per category ship** as
+  `labeled_examples.tsv`: 770 rows for A, 1,500 for B. They show the label format
+  and pin down what each category covers. They stay in `pool.tsv` under the same
+  ids, so the documented pool sizes and id ranges are unchanged. Ten rows per
+  class is a seed, not a training set; the pool still has to be labelled and the
+  assignment says so. Rebuilt by `scripts/build_labeled_examples.py`, which is
+  deterministic and self-checking, and the selection rule is written up in
+  `workshop/data/README.md`. Both of those are instructor-only and git-ignored,
+  so a public clone has the seed files but neither the builder nor the write-up.
 
 ## Reference numbers
 

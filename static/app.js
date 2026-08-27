@@ -92,7 +92,6 @@
     submitting: false,
     pending: null,                  // validated entries waiting for submit
     pendingFile: null,              // {name, text} of the parsed file
-    deleteBench: null,
     statusKey: null,
     views: {},                      // per-table sort state + caches, filled below
   };
@@ -1072,38 +1071,35 @@
         tag.className = "slot-bench" + (bench === "B" ? " bench-b" : "");
         tag.textContent = bench;
         slot.appendChild(tag);
+        const txt = document.createElement("span");
         if (m) {
-          const txt = document.createElement("span");
-          txt.append(`${fmtPct(m.metric)} · #${m.rank} `);
-          slot.appendChild(txt);
-          const rep = document.createElement("button");
-          rep.type = "button";
-          rep.className = "btn btn-ghost btn-sm";
-          rep.textContent = "Replace";
-          rep.dataset.act = bench + ":replace";
-          rep.addEventListener("click", () => openUploadDialog(rep));
-          const del = document.createElement("button");
-          del.type = "button";
-          del.className = "btn btn-ghost btn-sm";
-          del.textContent = "Delete";
-          del.dataset.act = bench + ":delete";
-          del.addEventListener("click", () => openDeleteDialog(bench, del));
-          slot.append(rep, del);
+          txt.append(`${fmtPct(m.metric)} · #${m.rank}`);
         } else {
-          const txt = document.createElement("span");
           txt.className = "slot-missing";
-          txt.textContent = "no result, counts as 0 ";
-          slot.appendChild(txt);
-          const up = document.createElement("button");
-          up.type = "button";
-          up.className = "btn btn-ghost btn-sm";
-          up.textContent = "Upload";
-          up.dataset.act = bench + ":upload";
-          up.addEventListener("click", () => openUploadDialog(up));
-          slot.appendChild(up);
+          txt.textContent = "no result, counts as 0";
         }
+        slot.appendChild(txt);
         box.appendChild(slot);
       }
+      // One file carries both benchmarks, so an upload rewrites both rows and a
+      // delete drops both. The controls say so: one shared pair for the strip,
+      // not a pair per benchmark that would promise a per-benchmark edit.
+      const acts = document.createElement("span");
+      acts.className = "slot";
+      const rep = document.createElement("button");
+      rep.type = "button";
+      rep.className = "btn btn-ghost btn-sm";
+      rep.textContent = "Replace both";
+      rep.dataset.act = "all:replace";
+      rep.addEventListener("click", () => openUploadDialog(rep));
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "btn btn-ghost btn-sm";
+      del.textContent = "Delete both";
+      del.dataset.act = "all:delete";
+      del.addEventListener("click", () => openDeleteDialog(del));
+      acts.append(rep, del);
+      box.appendChild(acts);
       if (ov) {
         const line = document.createElement("span");
         line.className = "slot-overall";
@@ -1398,24 +1394,24 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Delete (per benchmark)
+  // Delete (both benchmarks at once)
   // ---------------------------------------------------------------------------
+  // A submission file always carries both benchmarks, so the caller's rows live
+  // and die together: one DELETE clears the lot.
   let deleteOpener = null;
-  function openDeleteDialog(bench, opener) {
+  function openDeleteDialog(opener) {
     deleteOpener = opener || null;
-    state.deleteBench = bench;
-    el.deleteTitle.textContent = `Delete your Benchmark ${bench} result?`;
-    el.deleteHint.textContent = `This removes your row from the Benchmark ${bench} ladder (the other benchmark is untouched). You can upload a new file at any time.`;
+    el.deleteTitle.textContent = "Delete your results?";
+    el.deleteHint.textContent = "This removes your rows from both ladders, Benchmark A and Benchmark B. You can upload a new file at any time.";
     if (!el.deleteDialog.open) el.deleteDialog.showModal();
   }
   async function deleteMine() {
-    const bench = state.deleteBench;
     el.btnConfirmDelete.disabled = true;
     try {
-      await api("DELETE", `/api/submissions/mine/${bench}`);
+      await api("DELETE", "/api/submissions/mine");
       el.deleteDialog.close();
       await refresh({ silent: false });
-      showToast(`Your Benchmark ${bench} result was deleted.`, "success");
+      showToast("Your results were deleted.", "success");
     } catch (err) {
       el.deleteDialog.close();
       showToast(`Delete failed: ${err.message}`, "error");

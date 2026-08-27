@@ -24,7 +24,7 @@ Per benchmark, in `benchmark_a/` and `benchmark_b/`:
 | File | Contents |
 |---|---|
 | `pool.tsv` | training messages, one per line, without labels |
-| `labeled_examples.tsv` | ten pool messages with their real labels, to show the format |
+| `labeled_examples.tsv` | 10 pool messages per category with their real labels: 770 rows for A, 1,500 for B |
 | `intents.txt` | the category names, one per line |
 | `test.tsv` | the messages you are scored on, without labels |
 
@@ -32,11 +32,15 @@ Per benchmark, in `benchmark_a/` and `benchmark_b/`:
 
 ## Labels
 
-The data are given without labels. Producing them is part of the project, and an
-LLM on OpenRouter is the practical route, and manual supervision of label quality is necessary.
+The pool comes without labels, apart from a small seed set: `labeled_examples.tsv`
+gives you 10 correctly labelled messages for every category, 770 rows for
+Benchmark A and 1,500 for Benchmark B. Labelling the rest of the pool is part of
+the project, and an LLM on OpenRouter is the practical route, and manual
+supervision of label quality is necessary.
 
-The ten messages in `labeled_examples.tsv` are also in `pool.tsv`, under the
-same ids.
+Those messages are also in `pool.tsv`, under the same ids. They show the label
+format, and they are the one place where you can see what each category actually
+covers.
 
 Two rules:
 
@@ -47,11 +51,15 @@ Two rules:
 Before you train, hold out part of your labelled pool. That is your validation
 set.
 
-Your score on it says how well your model agrees with your own labels. It does
-not say how often your model is right. It will catch a broken run and separate
-two systems that are far apart. Hand-label some
-of the held-out messages yourself and you learn something else: how good your
-own labels are. Label quality is usually what needs the work.
+What the score means depends on where those rows came from. Rows you labelled
+yourself only say how well your model agrees with your own labels, not how often
+it is right; that still catches a broken run and separates two systems that are
+far apart. The rows in `labeled_examples.tsv` are correct, so a slice held out of
+those is a real accuracy estimate, a small and therefore noisy one, and every row
+you hold out is a row your labelling pipeline no longer gets to learn from. Run
+that pipeline over the seed rows and compare what it produces against the labels
+that ship with them, and you learn the other half: how good your own labels are.
+Label quality is usually what needs the work.
 
 ## What counts
 
