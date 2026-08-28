@@ -1656,14 +1656,19 @@ RATELIMIT_ON = (os.environ.get("LEADERBOARD_RATELIMIT", "on").strip().lower()
 RATELIMIT_SCOPE = os.environ.get("LEADERBOARD_RATELIMIT_SCOPE", "ip").strip().lower()
 if RATELIMIT_SCOPE not in ("ip", "token", "both"):
     RATELIMIT_SCOPE = "ip"
-RATELIMIT_TOKEN_SLACK = 2     # the courtesy token tier is looser, so it can never bite first
+# The read tiers give the token bucket this much slack over its written limit,
+# so the courtesy tier can never bite a student before the address tier does.
+# The WRITE tiers pass their own token_slack of 1: there the token bucket is
+# the tight one on purpose, because it is the only bucket that is one person.
+RATELIMIT_TOKEN_SLACK = 2
 RL_PATH = DB_PATH.with_name("ratelimit.json")
 RL_LOCK_PATH = RL_PATH.with_name(RL_PATH.name + ".lock")
 # Buckets are tiny and both stores are flat in the number of them, so this is
 # sized for the whole workshop with room to spare: a student holds about seven
 # write-tier buckets, so 2000 covers a cohort of ~250 without a single eviction.
 RL_MAX_BUCKETS = 2000
-RL_UPLOAD_GAP_S = 2           # minimum seconds between two accepted uploads from one caller
+RL_UPLOAD_GAP_S = 2           # minimum seconds between two accepted uploads from one
+                              # BROWSER, or from one address when there is no token
 RL_FILE_WAIT_S = 0.05         # how long a thread waits for this worker's turn at the file
 RL_FILE_SPINS = 20            # then this many tries at the cross-process lock,
 RL_FILE_SPIN_S = 0.002        # 2 ms apart, before falling back to the memory store
@@ -1886,26 +1891,43 @@ def _rl_tiers(key: str, tiers: list[tuple[int, int]], slack: int, gap_s: int) ->
 
 
 def _rl_caller(prefix: str, tiers: list[tuple[int, int]], gap_s: int = 0,
-               ip_tiers: list[tuple[int, int]] | None = None) -> list[tuple]:
+               ip_tiers: list[tuple[int, int]] | None = None,
+               token_slack: int | None = None) -> list[tuple]:
     """The per-caller checks for this request under the configured scope.
 
-    `ip_tiers` lets the address bucket be looser than the token bucket. The
-    board poll uses it: a browser always sends its token, so the token tier is
-    the one that fits a student and the address tier is there to stop a
-    tokenless or token-rotating loop. Keeping that one loose is also the
-    insurance against _client_ip() turning out to be a proxy the whole class
-    shares, because a wrong guess there must not throttle everybody at once."""
+    An address is not a person. Roommates, a lab and a classroom behind one
+    NAT are one address and many students, so the two buckets have different
+    jobs and different sizes:
+
+      * the TOKEN bucket is one browser, which is as close to one student as
+        this site can get. `tiers` sizes it, and it is the tier meant to bite
+        the one student hammering the upload button
+      * the ADDRESS bucket, sized by `ip_tiers`, is a runaway guard for a
+        caller that shows no token at all, and the insurance against
+        _client_ip() turning out to be a proxy a whole room shares. It has to
+        hold a full room without ever refusing anyone in it
+
+    The minimum interval between two accepted writes goes on the bucket of
+    whoever is doing the writing. A browser identifies itself with
+    X-Owner-Token, so the gap follows the TOKEN: two students behind one
+    campus NAT are two browsers and must never queue behind each other. A
+    caller with no token is nothing but an address, so for them the gap stays
+    on the address and a bare curl loop is still slowed to one write every
+    couple of seconds."""
+    token = request.headers.get("X-Owner-Token", "").strip()
+    known = bool(token) and is_valid_token(token)
     checks: list[tuple] = []
     if RATELIMIT_SCOPE in ("ip", "both"):
-        checks += _rl_tiers(f"{prefix}|i|{_client_ip()}", ip_tiers or tiers, 1, gap_s)
-    token = request.headers.get("X-Owner-Token", "").strip()
-    if token and is_valid_token(token):
+        checks += _rl_tiers(f"{prefix}|i|{_client_ip()}", ip_tiers or tiers, 1,
+                            0 if known else gap_s)
+    if known:
         # Hashed, so the store on disk never holds a student's actual token.
         # Callers without a token are skipped entirely rather than sharing one
         # bucket, which would let a handful of them throttle all the rest.
         primary = RATELIMIT_SCOPE in ("token", "both")
-        checks += _rl_tiers(f"{prefix}|t|{hash_token(token)[:16]}", tiers,
-                            1 if primary else RATELIMIT_TOKEN_SLACK, gap_s if primary else 0)
+        slack = (token_slack if token_slack is not None
+                 else (1 if primary else RATELIMIT_TOKEN_SLACK))
+        checks += _rl_tiers(f"{prefix}|t|{hash_token(token)[:16]}", tiers, slack, gap_s)
     return checks
 
 
@@ -1932,8 +1954,15 @@ def _rl_plan() -> tuple[str, list[tuple]] | None:
         # link at kickoff, twice each, has to sail through, and a global window
         # of ten minutes means even a mistake here heals inside ten minutes
         # rather than holding the workshop data shut for the hour.
-        return "file", _rl_caller("zip", [(40, 3600)]) + [("peek", "g|zip", 900, 600),
-                                                          ("shed", "g|zip", 400, 600, 5)]
+        #
+        # The link is a plain <a href>, so a browser sends NO owner token with
+        # it: for this route the address tier is the only per-caller tier a
+        # student ever meets, and 40 an hour meant a classroom of 20 sharing
+        # one address ran out at two downloads each. 150 in five minutes holds
+        # a room of 40 taking it three times, and the window is short enough
+        # that even an exhausted budget is back in minutes, not in an hour.
+        return "file", (_rl_caller("zip", [(60, 300)], ip_tiers=[(150, 300)], token_slack=1)
+                        + [("peek", "g|zip", 900, 600), ("shed", "g|zip", 400, 600, 5)])
     if not path.startswith("/api/"):
         return None
     if method == "GET" and path in RL_READ_PATHS:
@@ -1948,12 +1977,25 @@ def _rl_plan() -> tuple[str, list[tuple]] | None:
         # uploads landed inside ten minutes, and a 600 s Retry-After in the
         # last ten minutes before the deadline is a student who never submits.
         # MAX_SUBMISSIONS is the runaway guard for row creation.
-        return "file", (_rl_caller("put", [(30, 600), (90, 3600)], RL_UPLOAD_GAP_S)
+        #
+        # 30 uploads in ten minutes is a fair limit for one PERSON and a
+        # hopeless one for a NAT: eleven students uploading three times each
+        # in the last ten minutes before the deadline exceeded it, and the
+        # ones it refused included students who had uploaded nothing at all.
+        # So 30/600 and 90/3600 stay, on the browser's own bucket, and the
+        # address gets 150/600 and 450/3600: a room of 40 uploading three
+        # times each inside the deadline window is 120, with headroom for the
+        # nervous, and anything past that is a loop rather than a classroom.
+        return "file", (_rl_caller("put", [(30, 600), (90, 3600)], RL_UPLOAD_GAP_S,
+                                   ip_tiers=[(150, 600), (450, 3600)], token_slack=1)
                         + [("peek", "g|put", 1500, 300), ("shed", "g|put", 600, 300, 8)])
     if method == "DELETE" and (path == "/api/submissions/mine"
                                or path.startswith("/api/submissions/mine/")):
-        return "file", _rl_caller("del", [(20, 600)]) + [("peek", "g|del", 400, 300),
-                                                         ("shed", "g|del", 150, 300, 6)]
+        # Same split as the upload tier, for the same reason: 20 deletes in
+        # ten minutes is one student changing their mind, but seven students
+        # behind one address doing it three times each is not a flood.
+        return "file", (_rl_caller("del", [(20, 600)], ip_tiers=[(120, 600)], token_slack=1)
+                        + [("peek", "g|del", 400, 300), ("shed", "g|del", 150, 300, 6)])
     if method == "DELETE" and path.startswith("/api/submissions/"):
         if admin_key_ok():
             return None        # the organiser's own cleanup tool, never throttled
@@ -1961,17 +2003,95 @@ def _rl_plan() -> tuple[str, list[tuple]] | None:
     return None
 
 
+def _rl_human_wait(seconds: int) -> str:
+    """A wait a person can act on. "3481 seconds" is a number nobody converts;
+    "about an hour" is something you can decide what to do about."""
+    seconds = max(1, int(seconds))
+    if seconds < 60:
+        return "1 second" if seconds == 1 else f"{seconds} seconds"
+    minutes = round(seconds / 60)
+    if minutes <= 1:
+        return "about a minute"
+    if minutes < 60:
+        return f"about {minutes} minutes"
+    hours = round(minutes / 60)
+    return "about an hour" if hours <= 1 else f"about {hours} hours"
+
+
+def _rl_back_link() -> str:
+    """Where the reader was before the browser followed a link into a refusal.
+    Only ever our own pages: a Referer from anywhere else is ignored, so this
+    can never be talked into pointing somewhere off the site."""
+    referrer = (request.referrer or "").strip()
+    if referrer.startswith(request.host_url) and "\n" not in referrer:
+        rest = referrer[len(request.host_url):]
+        if not rest.startswith(("/", "\\")):
+            return "/" + rest
+    return "/"
+
+
+def _rl_page(wait: int) -> str:
+    """The refusal a BROWSER gets. A plain-text body replaces the whole site
+    with one sentence and no way back, which is the worst thing a student can
+    be shown for clicking a download link one time too many."""
+    back = _rl_back_link()
+    # "Back" and "Leaderboard" would be the same button when there is no
+    # referrer to go back to, so in that case there is simply no Back button.
+    back_btn = ("" if back == "/" else
+                f'<a class="btn btn-primary" href="{html_mod.escape(back, quote=True)}">'
+                f'Back to where you were</a>')
+    what = "The benchmark data has" if request.path.startswith("/data/") else "This page has"
+    return f"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Too many requests, please wait</title>
+<link rel="icon" type="image/png" href="/static/favicon.png">
+<link rel="stylesheet" href="/static/style.css">
+<style>
+ .rl {{ max-width: 44rem; margin: 4rem auto; padding: 0 1.5rem; }}
+ .rl h1 {{ margin-bottom: 1rem; }}
+ .rl p {{ line-height: 1.6; margin: 0 0 1rem; }}
+ .rl .row {{ display: flex; gap: .75rem; flex-wrap: wrap; margin-top: 1.75rem; }}
+</style></head><body><main class="rl">
+ <h1>Please wait a moment</h1>
+ <p>{what} already been sent to your internet connection more times than the
+   site allows in a few minutes, so this one was not started.</p>
+ <p>Nothing is wrong with your work and nothing has been lost. A flat, a lab or
+   a whole campus usually shares one connection, so this can happen on your
+   first try because of what other people asked for.</p>
+ <p>Wait <strong>{html_mod.escape(_rl_human_wait(wait))}</strong> and use the
+   link again. Your submission, your results and the deadline are unaffected.</p>
+ <div class="row">
+   {back_btn}
+   <a class="btn btn-ghost" href="/">Leaderboard</a>
+   <a class="btn btn-ghost" href="/assignment">Assignment</a>
+   <a class="btn btn-ghost" href="/guide">Submission guide</a>
+ </div>
+</main></body></html>
+"""
+
+
 def _rl_too_many(wait: int):
     """429 in the shape the caller already understands. Built by hand rather
     than through abort(), which would drop both the details array the front end
-    reads and the Retry-After header."""
+    reads and the Retry-After header.
+
+    The API answers JSON, because the front end reads `details` and shows it to
+    the student. Anything else was reached by a link in a browser, so it gets a
+    small page in the site's own styling with the wait in a human unit and a
+    way back, rather than a bare line of text where the site used to be."""
     wait = max(1, min(int(wait), 3600))
     message = (f"You are sending requests too quickly. Wait {wait} "
                f"{'second' if wait == 1 else 'seconds'} and try again.")
     if request.path.startswith("/api/"):
         response = jsonify({"error": "Too many requests.", "details": [message]})
     else:
-        response = app.response_class(message + "\n", mimetype="text/plain")
+        try:
+            response = app.response_class(_rl_page(wait), mimetype="text/html")
+        except Exception:      # a refusal must never turn into a 500
+            app.logger.exception("rate limit page failed on %s", request.path)
+            response = app.response_class(message + "\n", mimetype="text/plain")
     response.status_code = 429
     response.headers["Retry-After"] = str(wait)
     return response

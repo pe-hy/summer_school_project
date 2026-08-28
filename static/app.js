@@ -89,6 +89,7 @@
     labeled: new Set(),             // person_keys whose names show on BOTH plots
     seededSelf: false,
     refreshSeq: 0,
+    loaded: false,                  // has a board response ever arrived?
     pollAfter: 0,                   // ms timestamp the poll may resume at, after a 429
     fileSeq: 0,
     submitting: false,
@@ -1157,6 +1158,7 @@
       ]);
       if (seq !== state.refreshSeq) return;
       if (final !== undefined) state.final = final;
+      state.loaded = true;
       state.rows = (data.submissions || []).filter((r) => typeof r.metric === "number");
       for (const bench of BENCH_KEYS) {
         state.ladders[bench] = computeRanks(state.rows.filter((r) => r.benchmark === bench));
@@ -1192,10 +1194,48 @@
       // through that adds load to a site that is already struggling, so hold
       // off for as long as it asked (a minute at most, so the board still
       // comes back on its own).
-      if (err.status === 429) state.pollAfter = Date.now() + Math.min(err.retryAfter || 30, 60) * 1000;
-      if (!silent) showToast(`Could not load the leaderboard: ${err.message}`, "error");
+      const waitS = err.status === 429
+        ? Math.min(err.retryAfter || 30, 60)
+        : Math.round(CONFIG.REFRESH_MS / 1000);
+      if (err.status === 429) state.pollAfter = Date.now() + waitS * 1000;
+      // A 429 carries the plain explanation and the wait in its details array.
+      // err.message is only the one-word summary ("Too many requests."), which
+      // tells a student nothing they can act on.
+      const details = err.details && err.details.length ? err.details : [err.message];
+      if (!silent) showToast(`Could not load the leaderboard: ${details[0]}`, "error");
       else el.statUpdated.textContent = "offline";
+      // Before the first successful load the page is nothing but a "Loading…"
+      // skeleton and a row of dashes, and a toast is gone in 4.5 seconds. Say
+      // what happened in the page itself and leave it there until data arrives.
+      if (!state.loaded) showLoadFailure(err, waitS);
     }
+  }
+
+  function placeholderRow(tbody, cols, text) {
+    if (!tbody) return;
+    const tr = document.createElement("tr");
+    tr.className = "placeholder-row";
+    const cell = td(null, text);
+    cell.colSpan = cols;
+    tr.appendChild(cell);
+    tbody.replaceChildren(tr);
+  }
+
+  // The board has never had data, so there is nothing on screen to preserve and
+  // nothing to contradict: fill the tables with the reason and the wait. The
+  // poll keeps running, so this is replaced by real rows without a reload.
+  function showLoadFailure(err, waitS) {
+    const when = waitS >= 45 ? "about a minute" : `about ${waitS} seconds`;
+    const message = err.status === 429
+      ? `The site is busy right now. The leaderboard loads by itself in ${when}, with no reload needed.`
+      : err.status === 0
+        ? `Cannot reach the server. The page keeps trying, ${when} apart, so leave it open.`
+        : `The leaderboard could not be loaded. The page tries again in ${when}.`;
+    placeholderRow(el.overallBody, 5, message);
+    for (const bench of BENCH_KEYS) {
+      if (ladders[bench]) placeholderRow(ladders[bench].tbody, 6, message);
+    }
+    el.statUpdated.textContent = "not loaded";
   }
 
   function scheduleRefresh() {
@@ -1281,7 +1321,13 @@
     if (!el.uploadDialog.open) el.uploadDialog.showModal();
   }
 
-  function showValidation(errors, { title = null, okMessage = "" } = {}) {
+  // What the box last said about the FILE itself, so a refusal that never even
+  // looked at the file (a 429) can add its line without wiping the list the
+  // student is working from.
+  let fileProblems = [];
+
+  function showValidation(errors, { title = null, okMessage = "", keep = false } = {}) {
+    if (!keep) fileProblems = errors.slice();
     const box = el.validationBox;
     box.replaceChildren();
     box.hidden = false;
@@ -1401,6 +1447,19 @@
     } catch (err) {
       setSubmitting(false);
       const details = err.details && err.details.length ? err.details : [err.message];
+      if (err.status === 429) {
+        // Nothing looked at the file this time, so everything the box already
+        // said about it is still true. The wait goes on top; the rest stays.
+        const kept = fileProblems.length
+          ? ["Still to fix from the last attempt:"].concat(fileProblems) : [];
+        if (el.uploadDialog.open) {
+          showValidation(details.concat(kept), { title: "Not sent. The site is busy:", keep: true });
+        } else {
+          showToast(`Submission failed: ${details[0]}`, "error");
+        }
+        el.btnSubmitUpload.disabled = false;
+        return;
+      }
       const title = err.status === 422 ? "The server could not score this file:"
         : err.status === 409 || err.status === 507 ? "Submission refused:" : "Could not submit:";
       if (el.uploadDialog.open) showValidation(details, { title });
@@ -1430,7 +1489,10 @@
       showToast("Your results were deleted.", "success");
     } catch (err) {
       el.deleteDialog.close();
-      showToast(`Delete failed: ${err.message}`, "error");
+      // Same reason as the load path: err.message is the summary, details is
+      // the sentence a student can act on ("Wait 43 seconds and try again.").
+      const details = err.details && err.details.length ? err.details : [err.message];
+      showToast(`Delete failed: ${details[0]}`, "error");
       refresh();
     } finally {
       el.btnConfirmDelete.disabled = false;
